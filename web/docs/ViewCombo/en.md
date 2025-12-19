@@ -1,10 +1,10 @@
 # View Combo 📋
 
-A ComfyUI node for splitting multiline text into individual lines with advanced pagination and selection capabilities.
+A ComfyUI node for splitting multiline text <span style="background-color:#1e4d3e;color:#34d399;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:0.9em;">INT</span>o individual lines with advanced pagination and selection capabilities.
 
 ## Features
 
-- Split multiline text into individual lines
+- Split multiline text <span style="background-color:#1e4d3e;color:#34d399;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:0.9em;">INT</span>o individual lines
 - Automatic filtering of empty lines
 - Pagination support with `start_index` and `max_rows`
 - Advanced range selection with string syntax
@@ -16,8 +16,8 @@ A ComfyUI node for splitting multiline text into individual lines with advanced 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `prompt` | STRING | "text" | Multiline text to process |
-| `start_index` | INT | 0 | Starting line index (0-based) |
-| `max_rows` | INT | 1000 | Maximum number of lines to return |
+| `start_index` | <span style="background-color:#1e4d3e;color:#34d399;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:0.9em;"><span style="background-color:#1e4d3e;color:#34d399;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:0.9em;">INT</span></span> | 0 | Starting line index (0-based) |
+| `max_rows` | <span style="background-color:#1e4d3e;color:#34d399;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:0.9em;">INT</span> | 1000 | Maximum number of lines to return |
 | `range_str` | STRING | "" | Range selector (takes priority if filled) |
 
 ## Outputs
@@ -26,8 +26,8 @@ A ComfyUI node for splitting multiline text into individual lines with advanced 
 |--------|------|-------------|
 | `STRING` | LIST | Raw text lines |
 | `COMBO` | LIST | Numbered text lines (format: `index: text`) |
-| `input_count` | INT | Total number of non-empty lines in input |
-| `output_count` | INT | Number of lines returned in current selection |
+| `input_count` | <span style="background-color:#1e4d3e;color:#34d399;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:0.9em;">INT</span> | Total number of non-empty lines in input |
+| `output_count` | <span style="background-color:#1e4d3e;color:#34d399;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:0.9em;">INT</span> | Number of lines returned in current selection |
 
 ## Range Syntax
 
@@ -124,7 +124,7 @@ Process text data in chunks using pagination (`start_index` + `max_rows`), usefu
 Connect other nodes to `range_str` to dynamically select specific lines based on workflow logic.
 
 ### 4. Data Validation
-Use `input_count` and `output_count` to verify data integrity and track processing progress.
+Use `input_count` and `output_count` to verify data <span style="background-color:#1e4d3e;color:#34d399;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:0.9em;">INT</span>egrity and track processing progress.
 
 ## Tips
 

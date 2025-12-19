@@ -16,8 +16,8 @@ Un nœud ComfyUI pour diviser un texte multiligne en lignes individuelles avec p
 | Paramètre | Type | Défaut | Description |
 |-----------|------|--------|-------------|
 | `prompt` | STRING | "text" | Texte multiligne à traiter |
-| `start_index` | INT | 0 | Index de ligne de départ (base 0) |
-| `max_rows` | INT | 1000 | Nombre maximum de lignes à retourner |
+| `start_index` | <span style="background-color:#1e4d3e;color:#34d399;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:0.9em;">INT</span> | 0 | Index de ligne de départ (base 0) |
+| `max_rows` | <span style="background-color:#1e4d3e;color:#34d399;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:0.9em;">INT</span> | 1000 | Nombre maximum de lignes à retourner |
 | `range_str` | STRING | "" | Sélecteur de plage (prioritaire si renseigné) |
 
 ## Sorties
@@ -26,8 +26,8 @@ Un nœud ComfyUI pour diviser un texte multiligne en lignes individuelles avec p
 |--------|------|-------------|
 | `STRING` | LIST | Lignes de texte brutes |
 | `COMBO` | LIST | Lignes de texte numérotées (format : `index: texte`) |
-| `input_count` | INT | Nombre total de lignes non-vides en entrée |
-| `output_count` | INT | Nombre de lignes retournées dans la sélection actuelle |
+| `input_count` | <span style="background-color:#1e4d3e;color:#34d399;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:0.9em;">INT</span> | Nombre total de lignes non-vides en entrée |
+| `output_count` | <span style="background-color:#1e4d3e;color:#34d399;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:0.9em;">INT</span> | Nombre de lignes retournées dans la sélection actuelle |
 
 ## Syntaxe Range
 
@@ -124,7 +124,7 @@ Traiter des données textuelles par morceaux en utilisant la pagination (`start_
 Connecter d'autres nœuds à l'entrée `range_str` pour sélectionner dynamiquement des lignes spécifiques en fonction de la logique du workflow.
 
 ### 4. Validation de Données
-Utiliser `input_count` et `output_count` pour vérifier l'intégrité des données et suivre la progression du traitement.
+Utiliser `input_count` et `output_count` pour vérifier l'<span style="background-color:#1e4d3e;color:#34d399;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:0.9em;">INT</span>égrité des données et suivre la progression du traitement.
 
 ## Conseils
 
