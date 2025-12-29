@@ -10,18 +10,11 @@ A collection of utility nodes designed to enhance your ComfyUI workflow with sma
 
 ## 📦 Installation
 
-### Method 1: Git Clone (Recommended)
-
 ```bash
 cd ComfyUI/custom_nodes
-git clone [your-repo-url] ComfyUI-TOO-Pack
+git clone https://github.com/tetsuoo-online/Comfyui-TOO-Pack
 ```
 
-### Method 2: Manual Install
-
-1. Download the repository
-2. Extract to `ComfyUI/custom_nodes/ComfyUI-TOO-Pack`
-3. Restart ComfyUI
 
 ### Requirements
 
