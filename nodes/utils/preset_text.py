@@ -93,7 +93,7 @@ class TOOPresetText:
     RETURN_TYPES = ("STRING",)
     RETURN_NAMES = ("text",)
     FUNCTION = "get_preset_value"
-    CATEGORY = "TOO/utils"
+    CATEGORY = "TOO-Pack/utils"
     
     def get_preset_value(self, preset):
         """Return the value for the selected preset"""

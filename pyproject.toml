@@ -1,15 +1,15 @@
 [project]
-name = "too-xmp-metadata"
-description = "Custom nodes for ComfyUI that allow you to read and write XMP metadata to images"
-version = "1.2.1"
+name = "too-pack"
+description = "A collection of utility nodes designed to enhance your ComfyUI workflow with smart image loading, Krita integration, widget extraction, and more."
+version = "1.0.2"
 license = {file = "LICENSE"}
 dependencies = ["pillow>=9.0.0", "numpy>=1.20.0"]
 
 [project.urls]
-Repository = "https://github.com/tetsuoo-online/comfyui-too-xmp-metadata"
+Repository = "https://github.com/tetsuoo-online/Comfyui-TOO-Pack"
 #  Used by Comfy Registry https://comfyregistry.org
 
 [tool.comfy]
 PublisherId = "tetsuoo-online"
-DisplayName = "comfyui-too-xmp-metadata"
+DisplayName = "comfyui-TOO-Pack"
 Icon = ""

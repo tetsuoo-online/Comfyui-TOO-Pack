@@ -1,6 +1,5 @@
 {
   "default negative": "worst quality, low quality, jpeg artifacts",
   "remove": "\\b",
-  "regex : extract filename from": "([^\\\\\\/]+)_safetensors$",
-  "regex : none": "none"
+  "regex : extract filename from": "([^\\\\\\/]+)_safetensors$"
 }
