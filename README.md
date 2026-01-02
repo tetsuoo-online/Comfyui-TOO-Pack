@@ -617,11 +617,10 @@ Subfolders are treated as individual items (unless `scan_subfolders` is enabled)
 ---
 
 
-## 🗺️ Roadmap
+## 🗺️ ToDo
 
-- [ ] No roadmap x)
-- [ ] Advanced workflow utilities
-- [ ] Integration with more external tools
+- Extract Widget From Node : aiming at nodes using name, title or ID
+
 
 ---
 
@@ -643,40 +642,3 @@ MIT License
 - **ComfyUI** - Amazing node-based interface
 - **Ollama** - Local LLM runtime
 - **Krita** - Open-source digital painting software
-
----
-
-## 📧 Support
-
-For bugs, feature requests, or questions:
-- Create an issue on GitHub
-- Submit a pull request
-- Check the documentation for each node
-
----
-
-## 🌟 Version
-
-**1.0.0** - Initial release
-
----
-
-## 📸 Screenshots
-
-*(Add your screenshots here)*
-
-### Smart Image Loader
-<!-- Add screenshot -->
-
-### Krita Bridge
-<!-- Add screenshot -->
-
-### Extract Widget From Node
-<!-- Add screenshot -->
-
-### Collection Categorizer
-<!-- Add screenshot -->
-
----
-
-**Made with ❤️ by Tetsuoo**
