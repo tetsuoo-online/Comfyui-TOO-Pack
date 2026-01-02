@@ -3,4 +3,5 @@ __temp/
 *.pyc
 *- Copie*.py
 node.zip
-PUBLISH.BAT
+_PUBLISH.BAT
+_update-version.ps1
