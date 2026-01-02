@@ -39,7 +39,7 @@ git clone https://github.com/tetsuoo-online/Comfyui-TOO-Pack
 
 ## 📚 Node Documentation
 
-### Smart Image Loader 🖼️
+### Smart Image Loader 🖼
 
 <details>
 <summary><b><a href="#" style="color:#60a5fa;text-decoration:none;">Click to expand full documentation</a></b></summary>
@@ -83,7 +83,7 @@ A flexible image loader that supports multiple input sources with priority order
 The node loads images in this order (from highest to lowest priority):
 
 1. **txt_path** 📄 : Randomly selects a path from text file
-2. **img_path** 🖼️ : Loads the specific image file
+2. **img_path** 🖼 : Loads the specific image file
 3. **img_directory** 📁 : Randomly selects an image from directory
 4. **image** ⚡ : Uses the provided image input
 
@@ -462,7 +462,7 @@ widget_names = "control_net_name, strength"
 
 ---
 
-### Collection Categorizer (LLM) 🗂️
+### Collection Categorizer (LLM) 🗂
 
 <details>
 <summary><b><a href="#" style="color:#60a5fa;text-decoration:none;">Click to expand full documentation</a></b></summary>
@@ -617,7 +617,7 @@ Subfolders are treated as individual items (unless `scan_subfolders` is enabled)
 ---
 
 
-## 🗺️ ToDo
+## 🗺 ToDo
 
 - Extract Widget From Node : aiming at nodes using name, title or ID
 
@@ -638,7 +638,7 @@ MIT License
 
 ## 🙏 Credits
 
-- **Claude AI ❤️** - AI assistant extraordinaire
+- **Claude AI ❤** - AI assistant extraordinaire
 - **ComfyUI** - Amazing node-based interface
 - **Ollama** - Local LLM runtime
 - **Krita** - Open-source digital painting software
