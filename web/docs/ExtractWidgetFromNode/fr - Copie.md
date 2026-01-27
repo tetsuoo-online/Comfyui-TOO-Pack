@@ -24,7 +24,7 @@ Extrait les valeurs de widgets spécifiques depuis n'importe quel node dans le w
 | Paramètre | Type | Description | Défaut |
 |-----------|------|-------------|--------|
 | **node_name** | <span style="background-color:#1e3a5f;color:#60a5fa;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:0.9em;">STRING</span> | Nom du type de node à cibler (ex: "Power Lora Loader") | `Power Lora Loader` |
-| **widget_names** | <span style="background-color:#1e3a5f;color:#60a5fa;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:0.9em;">STRING</span> | Noms des widgets à extraire (séparés par virgules) | `lora, strength` |
+| **widget_names** | <span style="background-color:#1e3a5f;color:#60a5fa;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:0.9em;">STRING</span> | Noms des widgets à extraire (séparés par virgules) | `lora_name, strength_model` |
 
 ### Paramètres cachés
 
@@ -44,18 +44,7 @@ Extrait les valeurs de widgets spécifiques depuis n'importe quel node dans le w
 
 ## 💡 Exemples d'utilisation
 
-### Cas 1 : Extraire des widgets spécifiques d'un Power Lora Loader (rgthree)
-```python
-node_name = "Power Lora Loader"
-widget_names = "lora, strength"
-```
-**Sortie :**
-```
-my_lora_v1.safetensors
-0.85
-```
-
-### Cas 1b : Extraire des widgets d'un LoraLoader standard
+### Cas 1 : Extraire des widgets spécifiques d'un Lora Loader
 ```python
 node_name = "LoraLoader"
 widget_names = "lora_name, strength_model"

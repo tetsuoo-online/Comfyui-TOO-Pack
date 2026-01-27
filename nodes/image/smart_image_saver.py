@@ -13,6 +13,32 @@ class TOOSmartImageSaver:
     Permet d'activer/désactiver facilement chaque élément du nom de fichier.
     """
     
+    def _safe_path(self, path):
+        """
+        Nettoie un chemin de fichier en retirant les caractères invalides.
+        Inspiré de StarSaveFolderString._safe_part()
+        """
+        if not path:
+            return path
+        
+        # Séparer le chemin en répertoire et nom de fichier
+        directory = os.path.dirname(path)
+        filename = os.path.basename(path)
+        
+        # Caractères invalides dans les noms de fichiers (Windows/Linux/Mac)
+        invalid = '<>:"|?*\n\r\t'
+        # Pour le nom de fichier, nettoyer tous les caractères invalides
+        clean_filename = "".join(c for c in filename if c not in invalid).strip()
+        
+        # Pour le répertoire, on garde les séparateurs de chemin
+        # On nettoie juste les \n, \r, \t
+        clean_directory = directory.replace('\n', '').replace('\r', '').replace('\t', '').strip()
+        
+        # Reconstruire le chemin
+        if clean_directory:
+            return os.path.join(clean_directory, clean_filename)
+        return clean_filename
+    
     @classmethod
     def INPUT_TYPES(cls):
         return {
@@ -99,6 +125,9 @@ class TOOSmartImageSaver:
         # Traiter output_folder avec syntaxe date
         output_folder = self._parse_date_tokens(output_folder)
         
+        # Nettoyer output_folder des caractères invalides
+        output_folder = self._safe_path(output_folder) if output_folder else output_folder
+        
         # Créer le dossier de sortie
         output_dir = folder_paths.get_output_directory()
         if output_folder:
@@ -136,6 +165,9 @@ class TOOSmartImageSaver:
             filename_parts = ["output"]
         
         filename_base = separator.join(filename_parts)
+        
+        # Nettoyer le nom de fichier des caractères invalides
+        filename_base = self._safe_path(filename_base) if filename_base else filename_base
         
         # Sauvegarder toutes les images
         saved_paths = []

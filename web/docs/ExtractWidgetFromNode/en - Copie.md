@@ -24,7 +24,7 @@ Extracts specific widget values from any node in the ComfyUI workflow.
 | Parameter | Type | Description | Default |
 |-----------|------|-------------|---------|
 | **node_name** | <span style="background-color:#1e3a5f;color:#60a5fa;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:0.9em;">STRING</span> | Node type name to target (e.g., "Power Lora Loader") | `Power Lora Loader` |
-| **widget_names** | <span style="background-color:#1e3a5f;color:#60a5fa;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:0.9em;">STRING</span> | Widget names to extract (comma-separated) | `lora, strength` |
+| **widget_names** | <span style="background-color:#1e3a5f;color:#60a5fa;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:0.9em;">STRING</span> | Widget names to extract (comma-separated) | `lora_name, strength_model` |
 
 ### Hidden Parameters
 
@@ -44,18 +44,7 @@ Extracts specific widget values from any node in the ComfyUI workflow.
 
 ## 💡 Usage Examples
 
-### Case 1: Extract specific widgets from Power Lora Loader (rgthree)
-```python
-node_name = "Power Lora Loader"
-widget_names = "lora, strength"
-```
-**Output:**
-```
-my_lora_v1.safetensors
-0.85
-```
-
-### Case 1b: Extract widgets from standard LoraLoader
+### Case 1: Extract specific widgets from Lora Loader
 ```python
 node_name = "LoraLoader"
 widget_names = "lora_name, strength_model"

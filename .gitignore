@@ -1,5 +1,6 @@
 __pycache__/
 __temp/
+venv/
 *.pyc
 *- Copie*.py
 node.zip

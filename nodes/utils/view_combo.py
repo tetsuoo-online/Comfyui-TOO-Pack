@@ -1,6 +1,3 @@
-# Original code from: cardenluo/ComfyUI-Apt_Preset - https://github.com/cardenluo/ComfyUI-Apt_Preset
-# License: Apache-2.0 (make workflow easy)
-
 class ViewCombo:
     """
     A node that splits multiline text into individual lines with pagination support.
@@ -26,9 +23,9 @@ class ViewCombo:
             }
         }
 
-    RETURN_TYPES = ("STRING", "STRING", "INT", "INT")
-    RETURN_NAMES = ("STRING", "COMBO", "input_count", "output_count")
-    OUTPUT_IS_LIST = (True, True, False, False)
+    RETURN_TYPES = ("STRING", "STRING", "INT", "INT", "FLOAT", "INT")
+    RETURN_NAMES = ("STRING", "COMBO", "input_count", "output_count", "FLOAT", "INT")
+    OUTPUT_IS_LIST = (True, True, False, False, True, True)
     FUNCTION = "generate_strings"
     CATEGORY = "TOO-Pack/utils"
     
@@ -50,70 +47,70 @@ class ViewCombo:
             - List of numbered text lines (COMBO)
             - Total number of non-empty lines in input (input_count)
             - Number of lines returned in current page (output_count)
+            - List of float conversions (FLOAT) - defaults to 1.0 if not a number
+            - List of int conversions (INT) - defaults to 1 if not a number
         """
-        # Split and filter out empty lines
         lines = [line for line in prompt.split('\n') if line.strip()]
         total_lines = len(lines)
         
-        # Parse range if provided
         if range_str.strip():
             rows = self._parse_range(lines, range_str.strip())
             indices = self._get_indices_from_range(range_str.strip(), total_lines)
         else:
-            # Use start_index and max_rows
             start_index = max(0, min(start_index, total_lines - 1))
             end_index = min(start_index + max_rows, total_lines)
             rows = lines[start_index:end_index]
             indices = list(range(start_index, end_index))
         
-        # Create numbered version for COMBO output
         combo_rows = [f"{idx}: {line}" for idx, line in zip(indices, rows)]
         
-        # Total count of non-empty lines in original text
-        input_count = total_lines
+        # Convert to float/int with fallback
+        float_rows = []
+        int_rows = []
+        for line in rows:
+            try:
+                float_val = float(line.strip())
+                float_rows.append(float_val)
+            except:
+                float_rows.append(1.0)
+            
+            try:
+                int_val = int(float(line.strip()))
+                int_rows.append(int_val)
+            except:
+                int_rows.append(1)
         
-        # Count of lines actually returned
+        input_count = total_lines
         output_count = len(rows)
         
-        return (rows, combo_rows, input_count, output_count)
+        return (rows, combo_rows, input_count, output_count, float_rows, int_rows)
     
     def _parse_range(self, lines, range_str):
         """Parse range string and return selected lines."""
         total = len(lines)
         
-        # Handle comma-separated format first (specific indices list)
-        # This takes priority to avoid confusion with negative numbers
         if ',' in range_str:
             parts = range_str.split(',')
             indices = [int(p.strip()) for p in parts]
-            # Convert negative indices
             indices = [i if i >= 0 else total + i for i in indices]
-            # Filter valid indices
             indices = [i for i in indices if 0 <= i < total]
             return [lines[i] for i in indices]
         
-        # Handle range format with dash: "0-2" or "4--1" (negative end)
-        # Need to distinguish "4--1" from "4-1" 
         if '-' in range_str:
-            # Try to parse as range
-            # Look for pattern: number followed by - followed by number
             import re
             match = re.match(r'^(-?\d+)-(-?\d+)$', range_str)
             if match:
                 start = int(match.group(1))
                 end = int(match.group(2))
                 
-                # Handle negative indices
                 if start < 0:
                     start = total + start
                 if end < 0:
                     end = total + end
                 
-                # Ensure valid range
                 start = max(0, min(start, total - 1))
                 end = max(0, min(end, total - 1))
                 
-                # Determine direction
                 if start <= end:
                     indices = list(range(start, end + 1))
                 else:
@@ -121,7 +118,6 @@ class ViewCombo:
                 
                 return [lines[i] for i in indices if 0 <= i < total]
         
-        # Single index
         try:
             idx = int(range_str)
             if idx < 0:
@@ -135,14 +131,12 @@ class ViewCombo:
     
     def _get_indices_from_range(self, range_str, total):
         """Get the actual indices used for numbering."""
-        # Handle comma-separated format first (specific indices)
         if ',' in range_str:
             parts = range_str.split(',')
             indices = [int(p.strip()) for p in parts]
             indices = [i if i >= 0 else total + i for i in indices]
             return [i for i in indices if 0 <= i < total]
         
-        # Handle range format with dash
         if '-' in range_str:
             import re
             match = re.match(r'^(-?\d+)-(-?\d+)$', range_str)
@@ -163,7 +157,6 @@ class ViewCombo:
                 else:
                     return list(range(start, end - 1, -1))
         
-        # Single index
         try:
             idx = int(range_str)
             if idx < 0:

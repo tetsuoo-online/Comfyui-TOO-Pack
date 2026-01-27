@@ -8,9 +8,9 @@ class ExtractWidgetFromNode:
                     "tooltip": "The class type of the node to extract from (e.g., 'Power Lora Loader', 'LoraLoader', 'KSampler')"
                 }),
                 "widget_names": ("STRING", {
-                    "default": "lora_name, strength_model",
+                    "default": "lora, strength",
                     "multiline": False,
-                    "tooltip": "Comma-separated list of widgets to extract. Examples: 'lora_name, strength_model' for Power Lora Loader, 'seed, steps, cfg' for KSampler. Leave empty to extract all widgets."
+                    "tooltip": "Comma-separated list of widgets to extract. Examples: 'lora, strength' for Power Lora Loader (rgthree), 'lora_name, strength_model' for LoraLoader, 'seed, steps, cfg' for KSampler. Leave empty to extract all widgets."
                 }),
             },
             "hidden": {
