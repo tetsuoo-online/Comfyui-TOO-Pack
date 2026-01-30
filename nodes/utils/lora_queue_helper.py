@@ -21,7 +21,7 @@ class LoraQueueHelper:
     RETURN_TYPES = ("MODEL", "CLIP", "STRING",)
     RETURN_NAMES = ("MODEL", "CLIP", "lora_info",)
     FUNCTION = "apply"
-    CATEGORY = "TOO-Pack/utils"
+    CATEGORY = "🔵TOO-Pack/utils"
     OUTPUT_IS_LIST = (True, True, True,)
 
     def parse_range(self, range_str, total):
@@ -117,7 +117,7 @@ class LoraListHelper:
     RETURN_TYPES = ("STRING",)
     RETURN_NAMES = ("lora_list",)
     FUNCTION = "list_loras"
-    CATEGORY = "loaders"
+    CATEGORY = "🔵TOO-Pack/utils"
 
     def list_loras(self, folder_filter):
         all_loras = folder_paths.get_filename_list("loras")

@@ -60,4 +60,9 @@ NODE_DISPLAY_NAME_MAPPINGS.update(TOO_MUCH_REPLACE_DISPLAY_MAPPINGS)
 # Define the web directory for ComfyUI to find our JavaScript files
 WEB_DIRECTORY = "./web"
 
+# Define extension web directories for icons
+EXTENSION_WEB_DIRS = {
+    "TOO-Pack": WEB_DIRECTORY
+}
+
 __all__ = ['NODE_CLASS_MAPPINGS', 'NODE_DISPLAY_NAME_MAPPINGS', 'WEB_DIRECTORY']

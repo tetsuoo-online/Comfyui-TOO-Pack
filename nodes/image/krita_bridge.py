@@ -26,7 +26,7 @@ class KritaBridgeNode:
     RETURN_TYPES = ("IMAGE", "MASK")
     RETURN_NAMES = ("image", "mask")
     FUNCTION = "load_krita_image"
-    CATEGORY = "TOO-Pack/image"
+    CATEGORY = "🔵TOO-Pack/image"
     
     def __init__(self):
         self.last_file = None

@@ -1,5 +1,6 @@
 {
   "default negative": "worst quality, low quality, jpeg artifacts",
   "remove": "\\b",
-  "regex : extract filename from": "([^\\\\\\/]+)_safetensors$"
+  "regex : extract filename from": "([^\\\\\\/]+)_safetensors$",
+  "japanese woman": "转为真人真实场景，日本女人高傲的表情"
 }

@@ -16,7 +16,6 @@ class TOOSmartImageSaver:
     def _safe_path(self, path):
         """
         Nettoie un chemin de fichier en retirant les caractères invalides.
-        Inspiré de StarSaveFolderString._safe_part()
         """
         if not path:
             return path
@@ -116,7 +115,7 @@ class TOOSmartImageSaver:
     RETURN_NAMES = ("images", "filepath")
     FUNCTION = "save_images"
     OUTPUT_NODE = True
-    CATEGORY = "TOO-Pack/image"
+    CATEGORY = "🔵TOO-Pack/image"
 
     def save_images(self, images, output_folder, prefix, suffix, 
                    seed_node_name, seed_widget_name, model_node_name, model_widget_name,

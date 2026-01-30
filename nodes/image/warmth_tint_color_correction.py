@@ -60,7 +60,7 @@ class CustomColorTint:
     
     RETURN_TYPES = ("IMAGE",)
     FUNCTION = "apply_tint"
-    CATEGORY = "TOO-Pack/image"
+    CATEGORY = "🔵TOO-Pack/image"
     
     def apply_tint(self, image, color_hex, intensity, blend_mode, preserve_luminosity):
         """

@@ -1,7 +1,7 @@
 [project]
 name = "too-pack"
 description = "A collection of utility nodes designed to enhance your ComfyUI workflow with smart image loading, Krita integration, widget extraction, and more."
-version = "1.0.3"
+version = "1.0.4"
 license = {file = "LICENSE"}
 dependencies = ["pillow>=9.0.0", "numpy>=1.20.0"]
 

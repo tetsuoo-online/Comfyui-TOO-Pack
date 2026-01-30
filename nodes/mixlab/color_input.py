@@ -15,7 +15,7 @@ class ColorInput:
     RETURN_TYPES = ("STRING", "STRING", "STRING", "STRING", "STRING",)
     RETURN_NAMES = ("hex", "r", "g", "b", "a",)
     FUNCTION = "run"
-    CATEGORY = "TOO-Pack/mixlab"
+    CATEGORY = "🔵TOO-Pack/mixlab"
     INPUT_IS_LIST = False
     OUTPUT_IS_LIST = (False, False, False, False, False,)
     

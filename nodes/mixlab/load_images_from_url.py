@@ -50,7 +50,7 @@ class LoadImagesFromURL:
     RETURN_TYPES = ("IMAGE", "MASK",)
     RETURN_NAMES = ("images", "masks",)
     FUNCTION = "load_images"
-    CATEGORY = "TOO-Pack/mixlab"
+    CATEGORY = "🔵TOO-Pack/mixlab"
     INPUT_IS_LIST = False
     OUTPUT_IS_LIST = (True, True,)
     

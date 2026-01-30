@@ -23,7 +23,7 @@ Extrait les valeurs de widgets spécifiques depuis n'importe quel node dans le w
 
 | Paramètre | Type | Description | Défaut |
 |-----------|------|-------------|--------|
-| **node_name** | <span style="background-color:#1e3a5f;color:#60a5fa;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:0.9em;">STRING</span> | Nom du type de node à cibler (ex: "Power Lora Loader") | `Power Lora Loader` |
+| **node_name** | <span style="background-color:#1e3a5f;color:#60a5fa;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:0.9em;">STRING</span> | Nom du type de node (ex: "Power Lora Loader") OU ID du node (ex: "#180" ou "#45:180" pour subgraph) | `Power Lora Loader` |
 | **widget_names** | <span style="background-color:#1e3a5f;color:#60a5fa;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:0.9em;">STRING</span> | Noms des widgets à extraire (séparés par virgules) | `lora, strength` |
 
 ### Paramètres cachés
@@ -104,6 +104,14 @@ lora3.safetensors
 ```python
 # Connecter la sortie STRING à un node de texte
 # Exemple : Save Text, String Literal, etc.
+```
+
+### Cas 6 : Cibler un node spécifique par ID
+```python
+node_name = "#180"  # Node unique
+# ou
+node_name = "#45:180"  # Node 180 dans le subgraph 45
+widget_names = "lora, strength"
 ```
 
 ---

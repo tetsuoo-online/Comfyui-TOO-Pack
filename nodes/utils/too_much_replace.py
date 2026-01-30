@@ -58,7 +58,7 @@ class TooMuchReplace:
     
     RETURN_TYPES = ("STRING",)
     FUNCTION = "process"
-    CATEGORY = "TOO-Pack/utils"
+    CATEGORY = "🔵TOO-Pack/utils"
     OUTPUT_NODE = False
 
     @classmethod
@@ -93,5 +93,5 @@ NODE_CLASS_MAPPINGS = {
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "TooMuchReplace": "TOO Much Replace"
+    "TooMuchReplace": "TOO Much Replace 🔄"
 }

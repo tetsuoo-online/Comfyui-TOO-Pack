@@ -32,7 +32,7 @@ class CollectionCategorizer:
     RETURN_TYPES = ("STRING", "STRING",)
     RETURN_NAMES = ("json_output", "summary",)
     FUNCTION = "categorize_collection"
-    CATEGORY = "TOO-Pack/utils"
+    CATEGORY = "🔵TOO-Pack/utils"
     OUTPUT_NODE = True
 
     def scan_folder(self, folder_path: str, scan_subfolders: bool = False):

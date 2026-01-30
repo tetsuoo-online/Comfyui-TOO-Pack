@@ -27,7 +27,7 @@ class SmartImageLoader:
     RETURN_TYPES = ("IMAGE", "STRING")
     RETURN_NAMES = ("IMAGE", "FILE_PATH")
     FUNCTION = "load_smart"
-    CATEGORY = "TOO-Pack/image"
+    CATEGORY = "🔵TOO-Pack/image"
 
     def load_smart(self, seed, txt_path="", img_path="", img_directory="", image=None):
         """

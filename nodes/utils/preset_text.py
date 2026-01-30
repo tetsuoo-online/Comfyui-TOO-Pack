@@ -93,7 +93,7 @@ class TOOPresetText:
     RETURN_TYPES = ("STRING",)
     RETURN_NAMES = ("text",)
     FUNCTION = "get_preset_value"
-    CATEGORY = "TOO-Pack/utils"
+    CATEGORY = "🔵TOO-Pack/utils"
     
     def get_preset_value(self, preset):
         """Return the value for the selected preset"""
@@ -131,5 +131,5 @@ NODE_CLASS_MAPPINGS = {
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "TOOPresetText": "TOO Preset Text"
+    "TOOPresetText": "TOO Preset Text 📋"
 }

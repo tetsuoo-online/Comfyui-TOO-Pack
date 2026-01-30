@@ -27,7 +27,7 @@ class ViewCombo:
     RETURN_NAMES = ("STRING", "COMBO", "input_count", "output_count", "FLOAT", "INT")
     OUTPUT_IS_LIST = (True, True, False, False, True, True)
     FUNCTION = "generate_strings"
-    CATEGORY = "TOO-Pack/utils"
+    CATEGORY = "🔵TOO-Pack/utils"
     
     def generate_strings(self, prompt, start_index, max_rows, range_str="", workflow_prompt=None, my_unique_id=None):
         """

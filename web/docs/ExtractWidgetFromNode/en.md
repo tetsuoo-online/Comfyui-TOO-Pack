@@ -23,7 +23,7 @@ Extracts specific widget values from any node in the ComfyUI workflow.
 
 | Parameter | Type | Description | Default |
 |-----------|------|-------------|---------|
-| **node_name** | <span style="background-color:#1e3a5f;color:#60a5fa;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:0.9em;">STRING</span> | Node type name to target (e.g., "Power Lora Loader") | `Power Lora Loader` |
+| **node_name** | <span style="background-color:#1e3a5f;color:#60a5fa;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:0.9em;">STRING</span> | Node type name (e.g., "Power Lora Loader") OR node ID (e.g., "#180" or "#45:180" for subgraph) | `Power Lora Loader` |
 | **widget_names** | <span style="background-color:#1e3a5f;color:#60a5fa;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:0.9em;">STRING</span> | Widget names to extract (comma-separated) | `lora, strength` |
 
 ### Hidden Parameters
@@ -104,6 +104,14 @@ lora3.safetensors
 ```python
 # Connect STRING output to a text node
 # Example: Save Text, String Literal, etc.
+```
+
+### Case 6: Target specific node by ID
+```python
+node_name = "#180"  # Single node
+# or
+node_name = "#45:180"  # Node 180 inside subgraph 45
+widget_names = "lora, strength"
 ```
 
 ---

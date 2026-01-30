@@ -5,7 +5,7 @@ class ExtractWidgetFromNode:
             "required": {
                 "node_name": ("STRING", {
                     "default": "Power Lora Loader",
-                    "tooltip": "The class type of the node to extract from (e.g., 'Power Lora Loader', 'LoraLoader', 'KSampler')"
+                    "tooltip": "The class type of the node to extract from (e.g., 'Power Lora Loader', 'LoraLoader', 'KSampler') OR the node ID (e.g., '#180', '#42')"
                 }),
                 "widget_names": ("STRING", {
                     "default": "lora, strength",
@@ -22,7 +22,7 @@ class ExtractWidgetFromNode:
     
     RETURN_TYPES = ("STRING",)
     FUNCTION = "extract"
-    CATEGORY = "TOO-Pack/utils"
+    CATEGORY = "🔵TOO-Pack/utils"
     OUTPUT_NODE = False
 
     @classmethod
@@ -36,11 +36,22 @@ class ExtractWidgetFromNode:
         widget_list = [w.strip() for w in widget_names.split(",")] if widget_names else []
         result_lines = []
         
+        # Déterminer si node_name est un ID (format #123) ou un nom de classe
+        is_node_id = node_name.strip().startswith("#")
+        target_node_id = node_name.strip()[1:] if is_node_id else None
+        
         for node_id in prompt:
             node_data = prompt[node_id]
             class_type = node_data.get("class_type", "")
             
-            if node_name.lower() in class_type.lower():
+            # Vérifier si le nœud correspond soit par ID, soit par nom de classe
+            match = False
+            if is_node_id:
+                match = (str(node_id) == target_node_id)
+            else:
+                match = (node_name.lower() in class_type.lower())
+            
+            if match:
                 inputs = node_data.get("inputs", {})
                 node_results = []
                 processed_dicts = set()
@@ -95,5 +106,5 @@ NODE_CLASS_MAPPINGS = {
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "ExtractWidgetFromNode": "Extract Widget From Node"
+    "ExtractWidgetFromNode": "Extract Widget From Node 📋"
 }

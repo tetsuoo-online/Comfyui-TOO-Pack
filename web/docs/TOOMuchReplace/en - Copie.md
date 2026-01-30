@@ -2,7 +2,7 @@
 
 A string replacement node with 5 successive rules.
 
-**Category:** `🔵 TOO-Pack/utils`
+**Category:** `TOO-Pack/utils`
 
 ---
 
