@@ -31,6 +31,7 @@ git clone https://github.com/tetsuoo-online/Comfyui-TOO-Pack
 | Node | Category | Description |
 |------|----------|-------------|
 | [Smart Image Loader](#smart-image-loader-) | `TOO-Pack/image` | Flexible image loader with multiple sources |
+| [Smart Image Saver](#smart-image-saver-) | `TOO-Pack/image` | Intelligent saver with flexible naming and metadata |
 | [Krita Bridge](#krita-bridge-) | `TOO-Pack/image` | Auto-load images from Krita |
 | [Extract Widget From Node](#extract-widget-from-node-) | `TOO-Pack/utils` | Extract widget values from workflow nodes |
 | [Collection Categorizer](#collection-categorizer-llm-) | `TOO-Pack/utils` | Categorize files with local LLM (Ollama) |
@@ -146,6 +147,109 @@ The text file should contain one image path per line:
 | Full path | Image loaded from txt_path, img_path or img_directory |
 | `"external_input"` | Image provided via image parameter |
 | `"none"` | No valid source found (error) |
+
+</details>
+
+---
+
+### Smart Image Saver 💾
+
+<details>
+<summary><b><a href="#" style="color:#60a5fa;text-decoration:none;">Click to expand full documentation</a></b></summary>
+
+An intelligent image saver that replaces the SAVE_IMG subgraph with flexible filename customization.
+
+#### Features
+
+- **Flexible naming**: Customizable prefix, suffix, and separator
+- **Date tokens**: YYYY, MM, DD, HH, mm, ss, timestamp support
+- **Smart metadata extraction**: Auto-extract seed and model name from workflow
+- **Node targeting**: Target nodes by class name or direct ID (#10)
+- **Multiple formats**: WEBP (lossy/lossless), PNG, JPG/JPEG
+- **Metadata preservation**: Saves prompt and workflow in EXIF/PNG info
+
+#### Parameters
+
+**Required Parameters**
+
+| Parameter | Type | Description | Default |
+|-----------|------|-------------|---------|
+| **images** | <span style="background-color:#7c2d12;color:#fb923c;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:0.9em;">IMAGE</span> | Images to save | - |
+| **output_folder** | <span style="background-color:#1e3a5f;color:#60a5fa;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:0.9em;">STRING</span> | Output folder (supports date tokens) | `YYYY-MM-DD` |
+| **prefix** | <span style="background-color:#1e3a5f;color:#60a5fa;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:0.9em;">STRING</span> | Filename prefix (supports date tokens) | `ComfyUI_YYYY-MM-DD_HHmmss` |
+| **seed_node_name** | <span style="background-color:#1e3a5f;color:#60a5fa;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:0.9em;">STRING</span> | Node containing seed (class name or #ID) | `KSampler` |
+| **model_node_name** | <span style="background-color:#1e3a5f;color:#60a5fa;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:0.9em;">STRING</span> | Node containing model (class name or #ID) | `CheckpointLoaderSimple` |
+| **suffix** | <span style="background-color:#1e3a5f;color:#60a5fa;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:0.9em;">STRING</span> | Filename suffix (supports date tokens) | `""` |
+| **output_format** | <span style="background-color:#4a5568;color:#a0aec0;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:0.9em;">COMBO</span> | Image format | `webp` |
+| **quality** | <span style="background-color:#1e4d3e;color:#34d399;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:0.9em;">INT</span> | Compression quality (1-100) | `97` |
+
+**Outputs**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| **images** | <span style="background-color:#7c2d12;color:#fb923c;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:0.9em;">IMAGE</span> | Pass-through of input images |
+| **filepath** | <span style="background-color:#1e3a5f;color:#60a5fa;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:0.9em;">STRING</span> | Path of the first saved file |
+
+#### Filename Structure
+
+The node builds filenames in this order:
+```
+[prefix]_[seed]_[model_name]_[suffix].[format]
+```
+
+Elements are joined by the separator. Empty elements are skipped.
+
+#### Usage Examples
+
+**Case 1: Basic usage with date folder**
+```python
+output_folder = "YYYY-MM-DD"           # → 2024-01-30/
+prefix = "render_YYYYMMDD"              # → render_20240130
+seed_node_name = "KSampler"
+model_node_name = "CheckpointLoaderSimple"
+```
+**Output:** `2024-01-30/render_20240130_123456_mymodel.webp`
+
+**Case 2: Target node by ID**
+```python
+seed_node_name = "#10"                  # Target node with ID 10
+model_node_name = "#5"                  # Target node with ID 5
+```
+
+**Case 3: Disable seed or model**
+```python
+seed_node_name = ""                     # Don't include seed
+model_node_name = ""                    # Don't include model
+prefix = "my_render"
+suffix = "HHmmss"                       # Add timestamp
+```
+**Output:** `my_render_143025.webp`
+
+#### Date Tokens
+
+All date tokens are replaced with current date/time values:
+
+| Token | Description | Example |
+|-------|-------------|---------|
+| `YYYY` | Year (4 digits) | 2024 |
+| `MM` | Month (2 digits) | 01 |
+| `DD` | Day (2 digits) | 30 |
+| `HH` | Hour 24h (2 digits) | 14 |
+| `mm` | Minute (2 digits) | 30 |
+| `ss` | Second (2 digits) | 25 |
+| `timestamp` | Unix timestamp | 1706623825 |
+
+#### Node Targeting
+
+**By Class Name:**
+```python
+seed_node_name = "KSampler"              # Finds any KSampler node
+```
+
+**By Node ID:**
+```python
+seed_node_name = "#10"                   # Targets node with ID 10
+```
 
 </details>
 
