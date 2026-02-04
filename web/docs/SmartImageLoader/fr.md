@@ -24,6 +24,7 @@ Un chargeur d'images flexible qui supporte plusieurs sources d'entrée avec ordr
 | Paramètre | Type | Description | Défaut |
 |-----------|------|-------------|--------|
 | **seed** | <span style="background-color:#1e4d3e;color:#34d399;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:0.9em;">INT</span> | Seed pour sélection aléatoire reproductible | `0` |
+| **img_dir_level** | <span style="background-color:#1e4d3e;color:#34d399;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:0.9em;">INT</span> | Profondeur de sous-dossiers : -1=tous, 0=courant, 1-10=niveaux | `0` |
 
 ### Paramètres optionnels
 

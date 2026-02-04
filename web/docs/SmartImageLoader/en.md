@@ -24,6 +24,7 @@ A flexible image loader that supports multiple input sources with priority order
 | Parameter | Type | Description | Default |
 |-----------|------|-------------|---------|
 | **seed** | <span style="background-color:#1e4d3e;color:#34d399;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:0.9em;">INT</span> | Seed for reproducible random selection | `0` |
+| **img_dir_level** | <span style="background-color:#1e4d3e;color:#34d399;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:0.9em;">INT</span> | Subdirectory depth: -1=all, 0=current, 1-10=levels | `0` |
 
 ### Optional Parameters
 
