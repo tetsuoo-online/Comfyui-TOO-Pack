@@ -44,7 +44,7 @@ git clone https://github.com/tetsuoo-online/Comfyui-TOO-Pack
 ### Smart Image Loader 🖼
 
 <details>
-<summary><b><a href="#smart-image-loader-" style="color:#60a5fa;">Click to expand full documentation</a></b></summary>
+<summary><b><span style="color:#60a5fa;">Click to expand full documentation</span></b></summary>
 
 A flexible image loader that supports multiple input sources with priority order.
 
@@ -156,7 +156,7 @@ The text file should contain one image path per line:
 ### Smart Image Saver 💾
 
 <details>
-<summary><b><a href="#smart-image-saver-" style="color:#60a5fa;">Click to expand full documentation</a></b></summary>
+<summary><b><span style="color:#60a5fa;">Click to expand full documentation</span></b></summary>
 
 An intelligent image saver that replaces the SAVE_IMG subgraph with flexible filename customization.
 
@@ -260,7 +260,7 @@ seed_node_name = "#10"                   # Targets node with ID 10
 ### Smart Image Saver (Advanced) 💾
 
 <details>
-<summary><b><a href="#smart-image-saver-advanced-" style="color:#60a5fa;">Click to expand full documentation</a></b></summary>
+<summary><b><span style="color:#60a5fa;">Click to expand full documentation</span></b></summary>
 
 Node for saving images with advanced file naming and A1111/Civitai Auto V3 compatible metadata.
 
@@ -494,7 +494,7 @@ Use `any` inputs to inject dynamic information from other nodes (tags, descripti
 ### Extract Widget From Node 🔧
 
 <details>
-<summary><b><a href="#extract-widget-from-node-" style="color:#60a5fa;">Click to expand full documentation</a></b></summary>
+<summary><b><span style="color:#60a5fa;">Click to expand full documentation</span></b></summary>
 
 Extracts specific widget values from any node in the ComfyUI workflow.
 
@@ -641,7 +641,7 @@ widget_names = "control_net_name, strength"
 ### Krita Bridge 🎨
 
 <details>
-<summary><b><a href="#krita-bridge-" style="color:#60a5fa;">Click to expand full documentation</a></b></summary>
+<summary><b><span style="color:#60a5fa;">Click to expand full documentation</span></b></summary>
 
 Automatically loads the latest image from the `input/krita/` folder for seamless Krita integration.
 
@@ -794,7 +794,7 @@ The `IS_CHANGED` function returns current timestamp, forcing ComfyUI to:
 ### Collection Categorizer (LLM) 🗂
 
 <details>
-<summary><b><a href="#collection-categorizer-llm-" style="color:#60a5fa;">Click to expand full documentation</a></b></summary>
+<summary><b><span style="color:#60a5fa;">Click to expand full documentation</span></b></summary>
 
 A ComfyUI node that automatically scans your folders and categorizes content with a local LLM (Ollama).
 
