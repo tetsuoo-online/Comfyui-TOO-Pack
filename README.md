@@ -32,9 +32,8 @@ git clone https://github.com/tetsuoo-online/Comfyui-TOO-Pack
 |------|----------|-------------|
 | [Smart Image Loader](#smart-image-loader-) | `TOO-Pack/image` | Flexible image loader with multiple sources |
 | [Smart Image Saver](#smart-image-saver-) | `TOO-Pack/image` | Intelligent saver with flexible naming and metadata |
-| [Smart Image Saver (Advanced)](#smart-image-saver-advanced-) | `TOO-Pack/image` | Advanced saver with dynamic naming and A1111/Civitai metadata |
-| [Extract Widget From Node](#extract-widget-from-node-) | `TOO-Pack/utils` | Extract widget values from workflow nodes |
 | [Krita Bridge](#krita-bridge-) | `TOO-Pack/image` | Auto-load images from Krita |
+| [Extract Widget From Node](#extract-widget-from-node-) | `TOO-Pack/utils` | Extract widget values from workflow nodes |
 | [Collection Categorizer](#collection-categorizer-llm-) | `TOO-Pack/utils` | Categorize files with local LLM (Ollama) |
 
 ---
@@ -236,402 +235,20 @@ All date tokens are replaced with current date/time values:
 | `MM` | Month (2 digits) | 01 |
 | `DD` | Day (2 digits) | 30 |
 | `HH` | Hour 24h (2 digits) | 14 |
-| `mm` | Minutes (2 digits) | 30 |
-| `ss` | Seconds (2 digits) | 25 |
-| `timestamp` | Unix timestamp | 1706626225 |
+| `mm` | Minute (2 digits) | 30 |
+| `ss` | Second (2 digits) | 25 |
+| `timestamp` | Unix timestamp | 1706623825 |
 
 #### Node Targeting
 
-**By class name:**
+**By Class Name:**
 ```python
-seed_node_name = "KSampler"
-model_node_name = "CheckpointLoaderSimple"
+seed_node_name = "KSampler"              # Finds any KSampler node
 ```
 
-**By ID:**
+**By Node ID:**
 ```python
 seed_node_name = "#10"                   # Targets node with ID 10
-```
-
-</details>
-
----
-
-### Smart Image Saver (Advanced) 💾
-
-<details>
-<summary><b><a href="#" style="color:#60a5fa;text-decoration:none;">Click to expand full documentation</a></b></summary>
-
-Node for saving images with advanced file naming and A1111/Civitai Auto V3 compatible metadata.
-
-**Category:** TOO-Pack/image
-
-#### Features
-
-- Dynamic file naming with workflow extraction
-- Metadata injection/editing
-- Support for 3 universal inputs (`any1`, `any2`, `any3`)
-- Automatic model and LoRA extraction with hash calculation
-- Targeted text replacement
-- Customizable date formatting
-- A1111/Civitai compatible metadata
-- Output formats: PNG, JPG, WebP
-
-#### Inputs
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `images` | IMAGE | Images to save (required) |
-| `metadata` | METADATA | Optional metadata |
-| `workflow` | WORKFLOW | Workflow to embed |
-| `any1` | * | Universal input 1 |
-| `any2` | * | Universal input 2 |
-| `any3` | * | Universal input 3 |
-
-#### Outputs
-
-| Output | Type | Description |
-|--------|------|-------------|
-| `images` | IMAGE | Images passthrough |
-| `filepath` | STRING | Saved file path |
-
-#### Configuration (JS Interface)
-
-##### DATA
-Create custom data fields for metadata and naming.
-
-**Value formats:**
-- **Static text:** `"my_text"`
-- **Widget extraction:** `#123:widget_name` (node ID) or `ClassName:widget_name`
-- **Any input:** `[any1]`, `[any2]`, `[any3]`
-
-**Example:**
-```
-name: positive
-value: #45:text
-
-name: model_used
-value: [any1]
-```
-
-##### DATE FORMAT
-Format dates for naming.
-
-- **date1:** Date format (e.g. `YYYY-MM-DD`)
-- **date2:** Time format (e.g. `HHmmss`)
-- **date3:** Custom format
-
-**Available tokens:** `YYYY`, `YY`, `MM`, `DD`, `HH`, `mm`, `ss`, `timestamp`
-
-##### MODEL
-Automatic model extraction.
-
-**Value:** `#123:ckpt_name` or `[any1]`
-
-The node automatically calculates:
-- Model name (basename without extension)
-- Model hash (first 10 characters of SHA256)
-
-##### LORAS
-Automatic LoRA extraction with Civitai-compatible hash.
-
-**Add multiple loras:**
-- Lora 1: `#45:lora_name` or `[any1]`
-- Lora 2: `#67:lora_name` or `[any2]`
-
-**Multiline support:** If `[any1]` contains:
-```
-lora1.safetensors
-lora2.safetensors
-```
-→ Both are parsed automatically
-
-##### TEXT REPLACE
-Replace text in fields before naming.
-
-**Target:**
-- Empty or `[any1]`/`[any2]`/`[any3]` → Apply to all fields
-- `positive` → Apply only to "positive" field
-- `model` → Apply only to model
-
-**Example:**
-```
-target: positive
-in: (masterpiece)
-out: 
-```
-→ Removes "(masterpiece)" from positive prompt
-
-##### NAMING
-Build filename with available elements.
-
-**Available fields:**
-- `output_folder` : Output subfolder
-- `prefix` : File prefix
-- `extra1`, `extra2`, `extra3` : Additional fields
-- `model` : Model name
-- `suffix` : File suffix
-- `separator` : Separator character (default: `_`)
-
-**Available sources:**
-- Empty (ignored)
-- `[any1]`, `[any2]`, `[any3]` : Universal inputs
-- Data field name: `positive`, `seed`, `steps`, etc.
-- `model`, `loras` : Extracted values
-- `%date1`, `%date2`, `%date3` : Formatted dates
-
-**Naming example:**
-```
-prefix: %date1
-extra1: positive
-model: model
-suffix: seed
-separator: _
-```
-→ `2025-02-12_beautiful_landscape_MyModel_12345.webp`
-
-##### OUTPUT
-Output configuration.
-
-- **format:** `png`, `jpg`, `webp`
-- **quality:** 1-100 (for jpg/webp)
-- **save metadata:** Include A1111 metadata
-- **embed workflow:** Embed ComfyUI workflow (except JPG)
-
-#### Usage Examples
-
-##### Example 1: Naming with model and seed
-
-**Configuration:**
-```
-DATA:
-  - name: seed, value: #10:seed
-
-MODEL:
-  - extract: KSampler:ckpt_name
-
-NAMING:
-  - prefix: %date1
-  - model: model
-  - suffix: seed
-  - separator: _
-```
-
-**Result:** `2025-02-12_MyCheckpoint_8675309.webp`
-
-##### Example 2: LoRA extraction from any1
-
-**Workflow:**
-```
-ExtractWidgetFromNode → any1 (TOO Smart Image Saver)
-```
-
-**Configuration:**
-```
-LORAS:
-  - lora 1: [any1]
-
-NAMING:
-  - prefix: %date1
-  - extra1: loras
-```
-
-**If any1 contains:**
-```
-style_lora_v2.safetensors
-quality_lora_v1.safetensors
-```
-
-**Generated metadata:**
-```
-Lora hashes: "style_lora_v2: a1b2c3d4e5f6, quality_lora_v1: f6e5d4c3b2a1"
-```
-
-##### Example 3: Prompt cleanup with Text Replace
-
-**Configuration:**
-```
-TEXT REPLACE:
-  - target: positive
-  - in: (masterpiece, best quality)
-  - out: 
-
-NAMING:
-  - prefix: positive
-```
-
-**If positive = "beautiful landscape, (masterpiece, best quality)"**  
-**→ Filename:** `beautiful_landscape.webp`
-
-#### Practical Use Cases
-
-##### 1. Multi-LoRA Workflow
-Use `ExtractWidgetFromNode` to retrieve all used LoRAs → connect to `any1` → The node automatically calculates all hashes for Civitai compatibility.
-
-##### 2. Organization by Model
-Configure `output_folder: model` to automatically sort images by model used.
-
-##### 3. Complete Metadata
-Create data fields for all important parameters (seed, steps, cfg, sampler, scheduler) → The node generates complete A1111 metadata readable by Civitai and Automatic1111.
-
-##### 4. Smart Naming
-Use `any` inputs to inject dynamic information from other nodes (tags, descriptions, scores, etc.).
-
-#### Tips
-
-- **Data fields** are flexible: create as many fields as needed
-- **[any1]**, **[any2]**, **[any3]** accept any data type (converted to string)
-- **Multiline** is supported for loras: one line = one lora
-- **LoRA hashes** exclude safetensors metadata (Civitai AutoV3 compatible)
-- **Text replace** applies to extracted values before filename construction
-- **Empty lines** in data fields are automatically ignored
-- The **metadata** input has priority over node data fields, unless data fields are explicitly set (enables metadata injection/editing)
-
-</details>
-
----
-
-### Extract Widget From Node 🔧
-
-<details>
-<summary><b><a href="#" style="color:#60a5fa;text-decoration:none;">Click to expand full documentation</a></b></summary>
-
-Extracts specific widget values from any node in the ComfyUI workflow.
-
-#### Features
-
-- **Targeted extraction** of specific widgets by name
-- **Multiple widgets** supported (comma-separated)
-- **Multi-node support**: Targets all nodes matching class name
-- **Direct ID targeting** with `#ID` syntax
-- **Intelligent parsing** of nested structures
-- **"on" filter**: Ignores disabled elements
-
-#### Parameters
-
-**Required Parameters**
-
-| Parameter | Type | Description | Default |
-|-----------|------|-------------|---------|
-| **node_name** | <span style="background-color:#1e3a5f;color:#60a5fa;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:0.9em;">STRING</span> | Node class name or `#ID` to target | - |
-| **widget_names** | <span style="background-color:#1e3a5f;color:#60a5fa;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:0.9em;">STRING</span> | Widget name(s) to extract (comma-separated) | - |
-
-**Outputs**
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| **extracted_values** | <span style="background-color:#1e3a5f;color:#60a5fa;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:0.9em;">STRING</span> | Extracted values (multiline if multiple) |
-
-#### Usage Examples
-
-**Case 1: Extract a single widget**
-```python
-node_name = "KSampler"
-widget_names = "seed"
-```
-**Output:** `"12345"`
-
-**Case 2: Extract multiple widgets**
-```python
-node_name = "CLIPTextEncode"
-widget_names = "text, strength"
-```
-**Output:** 
-```
-beautiful landscape, masterpiece
-0.85
-```
-
-**Case 3: Target specific node by ID**
-```python
-node_name = "#10"
-widget_names = "ckpt_name"
-```
-
-**Case 4: Extract from multiple matching nodes**
-```python
-node_name = "LoraLoader"
-widget_names = "lora_name"
-```
-**Output (if 2 LoraLoader nodes exist):**
-```
-style_lora.safetensors
-detail_lora.safetensors
-```
-
-#### Technical Details
-
-**Node Targeting**
-
-The node supports two targeting modes:
-
-1. **By class name** (e.g., `"KSampler"`)
-   - Finds **all nodes** of this class
-   - Extracts from all matching nodes
-
-2. **By ID** (e.g., `"#10"`)
-   - Targets **specific node** with ID 10
-   - Only one node targeted
-
-**Widget Extraction**
-
-- **Simple values**: `"my_value"`
-- **Multiple values**: Separated by newlines
-- **Comma support**: `"widget1, widget2"` extracts both
-
-**Nested Dictionary Handling**
-
-The node intelligently handles nested dictionaries:
-
-**Simple structure:**
-```json
-{
-  "lora_name": "my_lora.safetensors",
-  "strength_model": 0.85
-}
-```
-
-**Nested structure (Power Lora Loader):**
-```json
-{
-  "loras": {
-    "on": true,
-    "lora_name": "my_lora.safetensors",
-    "strength_model": 0.85
-  }
-}
-```
-
-The node automatically extracts values from both structures.
-
-**"on" filter**
-
-If a dictionary contains `"on": false`, its values are **ignored**.
-
-#### Advanced Use Cases
-
-**1. Extract prompts from workflow**
-```python
-node_name = "CLIPTextEncode"
-widget_names = "text"
-```
-
-**2. Retrieve used seeds**
-```python
-node_name = "KSampler"
-widget_names = "seed"
-```
-
-**3. List all loaded models**
-```python
-node_name = "CheckpointLoader"
-widget_names = "ckpt_name"
-```
-
-**4. Extract control parameters**
-```python
-node_name = "ControlNetLoader"
-widget_names = "control_net_name, strength"
 ```
 
 </details>
@@ -785,6 +402,164 @@ The `IS_CHANGED` function returns current timestamp, forcing ComfyUI to:
                 ┌────────┐                        ┌──────┐
                 │ image  │                        │ mask │
                 └────────┘                        └──────┘
+```
+
+</details>
+
+---
+
+### Extract Widget From Node 🔧
+
+<details>
+<summary><b><a href="#" style="color:#60a5fa;text-decoration:none;">Click to expand full documentation</a></b></summary>
+
+Extracts specific widget values from any node in the ComfyUI workflow.
+
+#### Features
+
+- **Targeted extraction** of specific widgets by name
+- **Compatible** with all ComfyUI nodes
+- **Multiple extraction**: extract several widgets at once
+- **Auto mode**: extracts all widgets if none specified
+- **Smart handling** of dictionaries and nested values
+- **"on" filter**: ignores disabled widgets
+
+#### Parameters
+
+**Required Parameters**
+
+| Parameter | Type | Description | Default |
+|-----------|------|-------------|---------|
+| **node_name** | <span style="background-color:#1e3a5f;color:#60a5fa;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:0.9em;">STRING</span> | Node type name to target (e.g., "Power Lora Loader") | `Power Lora Loader` |
+| **widget_names** | <span style="background-color:#1e3a5f;color:#60a5fa;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:0.9em;">STRING</span> | Widget names to extract (comma-separated) | `lora_name, strength_model` |
+
+**Hidden Parameters**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| **extra_pnginfo** | <span style="background-color:#2d3748;color:#a0aec0;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:0.9em;">EXTRA_PNGINFO</span> | Workflow PNG metadata |
+| **prompt** | <span style="background-color:#2d3748;color:#a0aec0;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:0.9em;">PROMPT</span> | Current workflow data |
+| **unique_id** | <span style="background-color:#2d3748;color:#a0aec0;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:0.9em;">UNIQUE_ID</span> | Node unique ID |
+
+**Outputs**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| **STRING** | <span style="background-color:#1e3a5f;color:#60a5fa;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:0.9em;">STRING</span> | Extracted values (one per line, separated by `\n`) |
+
+#### Usage Examples
+
+**Case 1: Extract specific widgets from Lora Loader**
+```python
+node_name = "Power Lora Loader"
+widget_names = "lora_name, strength_model"
+```
+**Output:**
+```
+my_lora_v1.safetensors
+0.85
+```
+
+**Case 2: Extract multiple parameters from KSampler**
+```python
+node_name = "KSampler"
+widget_names = "seed, steps, cfg"
+```
+**Output:**
+```
+123456789
+20
+7.5
+```
+
+**Case 3: Extract all widgets (auto mode)**
+```python
+node_name = "CheckpointLoaderSimple"
+widget_names = ""  # Empty = extract all
+```
+
+**Case 4: Extract from multiple nodes of same type**
+```python
+node_name = "Power Lora Loader"
+widget_names = "lora_name"
+```
+**Output (if 3 Lora Loaders in workflow):**
+```
+lora1.safetensors
+lora2.safetensors
+lora3.safetensors
+```
+
+#### Technical Details
+
+**Node search**
+
+The node performs a **case-insensitive search** on `node_name`:
+- `"power lora"` will find `"Power Lora Loader"`
+- `"ksampler"` will find `"KSampler"` and `"KSamplerAdvanced"`
+
+**widget_names format**
+
+Widget names must be **comma-separated**:
+```python
+"widget1, widget2, widget3"
+```
+
+Spaces are automatically stripped.
+
+**Nested values handling**
+
+The node intelligently handles nested dictionaries:
+
+**Simple structure:**
+```json
+{
+  "lora_name": "my_lora.safetensors",
+  "strength_model": 0.85
+}
+```
+
+**Nested structure (Power Lora Loader):**
+```json
+{
+  "loras": {
+    "on": true,
+    "lora_name": "my_lora.safetensors",
+    "strength_model": 0.85
+  }
+}
+```
+
+The node automatically extracts values from both structures.
+
+**"on" filter**
+
+If a dictionary contains `"on": false`, its values are **ignored**.
+
+#### Advanced Use Cases
+
+**1. Extract prompts from workflow**
+```python
+node_name = "CLIPTextEncode"
+widget_names = "text"
+```
+
+**2. Retrieve used seeds**
+```python
+node_name = "KSampler"
+widget_names = "seed"
+```
+
+**3. List all loaded models**
+```python
+node_name = "CheckpointLoader"
+widget_names = "ckpt_name"
+```
+
+**4. Extract control parameters**
+```python
+node_name = "ControlNetLoader"
+widget_names = "control_net_name, strength"
 ```
 
 </details>
