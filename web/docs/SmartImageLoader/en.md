@@ -12,7 +12,6 @@ A flexible image loader that supports multiple input sources with priority order
 - **Smart priority order** with configurable inputs
 - **Random selection** with reproducible seed
 - **Multiple formats** supported (PNG, JPG, JPEG, BMP, WEBP, TIFF)
-- **Robust error handling**
 - **Returns file path** of loaded image
 
 ---

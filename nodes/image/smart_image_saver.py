@@ -7,10 +7,14 @@ import numpy as np
 import folder_paths
 from comfy.cli_args import args
 
+import piexif
+import piexif.helper
+
 class TOOSmartImageSaver:
     """
     Node de sauvegarde d'images intelligent qui remplace le subgraph SAVE_IMG.
     Permet d'activer/désactiver facilement chaque élément du nom de fichier.
+    Supporte les métadonnées au format Civitai (A1111) via ExifIFD.UserComment.
     """
     
     def _safe_path(self, path):
@@ -56,23 +60,20 @@ class TOOSmartImageSaver:
                     "tooltip": "Préfixe du nom. Supporte YYYY, YY, MM, DD, HH, mm, ss, timestamp. Ex: render_YYYYMMDD"
                 }),
                 
-                # Paramètres pour seed et model (si vides, non utilisés)
-                "seed_node_name": ("STRING", {
-                    "default": "KSampler",
-                    "tooltip": "Nom de classe du node contenant le seed (ex: KSampler) ou #ID pour cibler par ID (ex: #10). Laisser vide pour ignorer."
+                "extra1": ("STRING", {
+                    "default": "",
+                    "multiline": False,
+                    "tooltip": "Extra data. Supporte YYYY, YY, MM, DD, HH, mm, ss, timestamp. Ex: seed_YYYYMMDD"
                 }),
-                "seed_widget_name": ("STRING", {
-                    "default": "seed",
-                    "tooltip": "Nom du widget contenant le seed"
+                "extra2": ("STRING", {
+                    "default": "",
+                    "multiline": False,
+                    "tooltip": "Extra data. Supporte YYYY, YY, MM, DD, HH, mm, ss, timestamp. Ex: denoise_YYYYMMDD"
                 }),
-                
-                "model_node_name": ("STRING", {
-                    "default": "CheckpointLoaderSimple",
-                    "tooltip": "Nom de classe du node contenant le modèle (ex: CheckpointLoaderSimple) ou #ID pour cibler par ID (ex: #5). Laisser vide pour ignorer."
-                }),
-                "model_widget_name": ("STRING", {
-                    "default": "ckpt_name",
-                    "tooltip": "Nom du widget contenant le modèle"
+                "model": ("STRING", {
+                    "default": "",
+                    "multiline": False,
+                    "tooltip": "Model name with relative path. Clean name will be extracted without the extension"
                 }),
                 
                 "suffix": ("STRING", {
@@ -104,6 +105,24 @@ class TOOSmartImageSaver:
                     "multiline": False,
                     "tooltip": "Séparateur entre les éléments du nom"
                 }),
+                
+                # Métadonnées
+                "embed_workflow": ("BOOLEAN", {
+                    "default": True,
+                    "tooltip": "Embarquer le workflow ComfyUI dans l'image"
+                }),
+                "save_metadata": ("BOOLEAN", {
+                    "default": True,
+                    "tooltip": "Sauvegarder les métadonnées A1111/Civitai"
+                }),
+            },
+            "optional": {
+                "metadata": ("METADATA", {
+                    "tooltip": "Métadonnées provenant de TOO Image Metadata"
+                }),
+                "workflow": ("WORKFLOW", {
+                    "tooltip": "Workflow ComfyUI à embarquer (écrase le workflow courant si embed_workflow activé)"
+                }),
             },
             "hidden": {
                 "prompt": "PROMPT",
@@ -117,9 +136,9 @@ class TOOSmartImageSaver:
     OUTPUT_NODE = True
     CATEGORY = "🔵TOO-Pack/image"
 
-    def save_images(self, images, output_folder, prefix, suffix, 
-                   seed_node_name, seed_widget_name, model_node_name, model_widget_name,
-                   output_format, webp_lossless, quality, separator, prompt=None, extra_pnginfo=None):
+    def save_images(self, images, output_folder, prefix, extra1, extra2, model, suffix,
+                   output_format, webp_lossless, quality, separator, embed_workflow, save_metadata,
+                   metadata=None, workflow=None, prompt=None, extra_pnginfo=None):
         
         # Traiter output_folder avec syntaxe date
         output_folder = self._parse_date_tokens(output_folder)
@@ -141,20 +160,22 @@ class TOOSmartImageSaver:
             prefix = self._parse_date_tokens(prefix)
             filename_parts.append(prefix)
         
-        # 2. Seed (si seed_node_name n'est pas vide)
-        if seed_node_name and prompt:
-            seed_value = self._extract_widget(prompt, seed_node_name, seed_widget_name)
-            if seed_value:
-                filename_parts.append(str(seed_value))
+        # 2. Extra1
+        if extra1:
+            extra1 = self._parse_date_tokens(extra1)
+            filename_parts.append(extra1)
         
-        # 3. Model name (si model_node_name n'est pas vide)
-        if model_node_name and prompt:
-            model_name = self._extract_widget(prompt, model_node_name, model_widget_name)
-            if model_name:
-                model_name = self._clean_model_name(model_name)
-                filename_parts.append(model_name)
+        # 3. Extra2
+        if extra2:
+            extra2 = self._parse_date_tokens(extra2)
+            filename_parts.append(extra2)
         
-        # 4. Suffix (peut contenir tokens date)
+        # 4. Model
+        if model:
+            model = self._clean_model_name(model)
+            filename_parts.append(model)
+        
+        # 5. Suffix (peut contenir tokens date)
         if suffix:
             suffix = self._parse_date_tokens(suffix)
             filename_parts.append(suffix)
@@ -167,6 +188,12 @@ class TOOSmartImageSaver:
         
         # Nettoyer le nom de fichier des caractères invalides
         filename_base = self._safe_path(filename_base) if filename_base else filename_base
+        
+        # Préparer les métadonnées A1111 si fournies et si save_metadata activé
+        a111_params = None
+        if save_metadata and metadata and isinstance(metadata, dict):
+            width, height = self._get_image_dimensions(images[0])
+            a111_params = self._build_a111_params(metadata, width, height)
         
         # Sauvegarder toutes les images
         saved_paths = []
@@ -192,45 +219,211 @@ class TOOSmartImageSaver:
             # Convertir tensor en image PIL
             img = self._tensor_to_pil(image)
             
-            # Ajouter les métadonnées (prompt et workflow) dans EXIF
-            if not args.disable_metadata:
-                exif = img.getexif()
-                if prompt is not None:
-                    # Ajouter le prompt dans EXIF tag "Make"
-                    exif[0x010f] = "Prompt:" + json.dumps(prompt)
-                if extra_pnginfo is not None:
-                    # Ajouter le workflow dans EXIF tag "ImageDescription"
-                    exif[0x010e] = "Workflow:" + json.dumps(extra_pnginfo["workflow"])
-            
             # Sauvegarder selon le format
-            if output_format == "webp":
-                if not args.disable_metadata:
-                    img.save(filepath, lossless=webp_lossless, quality=quality, method=6, exif=exif.tobytes())
-                else:
-                    img.save(filepath, lossless=webp_lossless, quality=quality, method=6)
-            elif output_format in ["jpg", "jpeg"]:
-                if not args.disable_metadata:
-                    img.save(filepath, quality=quality, exif=exif.tobytes())
-                else:
-                    img.save(filepath, quality=quality)
-            else:  # PNG
-                if not args.disable_metadata:
-                    # PNG utilise pnginfo au lieu de exif
-                    from PIL import PngImagePlugin
-                    metadata = PngImagePlugin.PngInfo()
-                    if prompt is not None:
-                        metadata.add_text("prompt", json.dumps(prompt))
-                    if extra_pnginfo is not None:
-                        metadata.add_text("workflow", json.dumps(extra_pnginfo["workflow"]))
-                    img.save(filepath, pnginfo=metadata)
-                else:
-                    img.save(filepath)
+            if output_format == "png":
+                self._save_png(img, filepath, a111_params, prompt, extra_pnginfo, embed_workflow, workflow)
+            elif output_format in ["webp", "jpg", "jpeg"]:
+                self._save_webp_jpeg(img, filepath, output_format, webp_lossless, quality, 
+                                    a111_params, prompt, extra_pnginfo, embed_workflow, workflow)
             
             saved_paths.append(filepath)
             print(f"💾 Image sauvegardée: {filepath}")
         
         # Retourner les images et le chemin du premier fichier
         return (images, saved_paths[0] if saved_paths else "")
+    
+    def _save_png(self, img, filepath, a111_params, prompt, extra_pnginfo, embed_workflow, workflow):
+        """Sauvegarde une image PNG avec métadonnées"""
+        from PIL import PngImagePlugin
+        
+        if args.disable_metadata:
+            img.save(filepath)
+            return
+        
+        metadata = PngImagePlugin.PngInfo()
+        
+        # Ajouter les paramètres A1111 dans "parameters"
+        if a111_params:
+            metadata.add_text("parameters", a111_params)
+        
+        # Ajouter le workflow ComfyUI si demandé
+        if embed_workflow:
+            # Si workflow est fourni en entrée, l'utiliser en priorité
+            if workflow and isinstance(workflow, dict):
+                wf_extra_pnginfo = workflow.get("extra_pnginfo")
+                wf_prompt = workflow.get("prompt")
+                
+                if wf_extra_pnginfo is not None:
+                    for k, v in wf_extra_pnginfo.items():
+                        metadata.add_text(k, json.dumps(v))
+                
+                if wf_prompt is not None:
+                    metadata.add_text("prompt", json.dumps(wf_prompt))
+            else:
+                # Sinon, utiliser le workflow courant
+                if extra_pnginfo is not None:
+                    for k, v in extra_pnginfo.items():
+                        metadata.add_text(k, json.dumps(v))
+                
+                if prompt is not None:
+                    metadata.add_text("prompt", json.dumps(prompt))
+        
+        img.save(filepath, pnginfo=metadata)
+    
+    def _save_webp_jpeg(self, img, filepath, output_format, webp_lossless, quality, 
+                       a111_params, prompt, extra_pnginfo, embed_workflow, workflow):
+        """Sauvegarde une image WEBP ou JPEG avec métadonnées EXIF"""
+        # Sauvegarder l'image d'abord
+        if output_format == "webp":
+            img.save(filepath, lossless=webp_lossless, quality=quality, method=6)
+        else:  # jpg/jpeg
+            img.save(filepath, quality=quality)
+        
+        # Ajouter les métadonnées EXIF si non désactivé
+        if args.disable_metadata:
+            return
+        
+        # Construire le dictionnaire EXIF
+        pnginfo_json = {}
+        prompt_json = {}
+        
+        # Workflow ComfyUI dans Make/Model tags si demandé
+        if embed_workflow:
+            # Si workflow est fourni en entrée, l'utiliser en priorité
+            if workflow and isinstance(workflow, dict):
+                wf_extra_pnginfo = workflow.get("extra_pnginfo")
+                wf_prompt = workflow.get("prompt")
+                
+                if wf_extra_pnginfo is not None:
+                    pnginfo_json = {
+                        piexif.ImageIFD.Make - i: f"{k}:{json.dumps(v, separators=(',', ':'))}" 
+                        for i, (k, v) in enumerate(wf_extra_pnginfo.items())
+                    }
+                
+                if wf_prompt is not None:
+                    prompt_json = {
+                        piexif.ImageIFD.Model: f"prompt:{json.dumps(wf_prompt, separators=(',', ':'))}"
+                    }
+            else:
+                # Sinon, utiliser le workflow courant
+                if extra_pnginfo is not None:
+                    pnginfo_json = {
+                        piexif.ImageIFD.Make - i: f"{k}:{json.dumps(v, separators=(',', ':'))}" 
+                        for i, (k, v) in enumerate(extra_pnginfo.items())
+                    }
+                
+                if prompt is not None:
+                    prompt_json = {
+                        piexif.ImageIFD.Model: f"prompt:{json.dumps(prompt, separators=(',', ':'))}"
+                    }
+        
+        # Construire le dictionnaire EXIF complet
+        exif_dict = {}
+        
+        # Section "0th" pour workflow
+        if pnginfo_json or prompt_json:
+            exif_dict["0th"] = pnginfo_json | prompt_json
+        
+        # Section "Exif" pour les paramètres A1111
+        if a111_params:
+            exif_dict["Exif"] = {
+                piexif.ExifIFD.UserComment: piexif.helper.UserComment.dump(
+                    a111_params, 
+                    encoding="unicode"
+                )
+            }
+        
+        # Générer et insérer les données EXIF
+        if exif_dict:
+            exif_bytes = piexif.dump(exif_dict)
+            
+            # Vérifier la taille pour JPEG
+            if output_format in ["jpg", "jpeg"]:
+                MAX_EXIF_SIZE = 65535
+                if len(exif_bytes) > MAX_EXIF_SIZE:
+                    print(f"⚠️ TOO Smart Image Saver: Métadonnées trop volumineuses ({len(exif_bytes)} bytes) pour JPEG (max {MAX_EXIF_SIZE})")
+                    # Essayer sans le workflow
+                    exif_dict_minimal = {}
+                    if a111_params:
+                        exif_dict_minimal["Exif"] = {
+                            piexif.ExifIFD.UserComment: piexif.helper.UserComment.dump(
+                                a111_params, 
+                                encoding="unicode"
+                            )
+                        }
+                    if exif_dict_minimal:
+                        exif_bytes = piexif.dump(exif_dict_minimal)
+                        if len(exif_bytes) <= MAX_EXIF_SIZE:
+                            piexif.insert(exif_bytes, filepath)
+                            print("   → Métadonnées A1111 sauvegardées (workflow omis)")
+                        else:
+                            print("   → Impossible de sauvegarder les métadonnées")
+                    return
+            
+            piexif.insert(exif_bytes, filepath)
+    
+    def _build_a111_params(self, metadata, width, height):
+        """
+        Construit la chaîne de paramètres au format A1111/Civitai.
+        Format: 
+        {positive}
+        Negative prompt: {negative}
+        Steps: {steps}, Sampler: {sampler} {scheduler}, CFG scale: {cfg}, Seed: {seed}, 
+        Size: {width}x{height}, Model hash: {hash}, Model: {model}, Lora hashes: "name1: hash1, name2: hash2"
+        """
+        positive = metadata.get("positive", "").strip()
+        negative = metadata.get("negative", "").strip()
+        seed = metadata.get("seed")
+        steps = metadata.get("steps", 20)
+        cfg = metadata.get("cfg", 7.0)
+        sampler_name = metadata.get("sampler_name", "euler")
+        scheduler = metadata.get("scheduler", "normal")
+        model_name = metadata.get("model_name", "").strip()
+        model_hash = metadata.get("model_hash", "").strip()
+        lora_hashes = metadata.get("lora_hashes", {})
+        custom = metadata.get("custom", "").strip()
+        
+        # Construction de la chaîne
+        parts = [positive]
+        
+        if negative:
+            parts.append(f"Negative prompt: {negative}")
+        
+        # Ligne des paramètres
+        params_line = f"Steps: {steps}, Sampler: {sampler_name} {scheduler}, CFG scale: {cfg}"
+        
+        if seed is not None:
+            params_line += f", Seed: {seed}"
+        
+        if width and height:
+            params_line += f", Size: {width}x{height}"
+        
+        if custom:
+            params_line += f", {custom}"
+        
+        if model_hash:
+            params_line += f", Model hash: {model_hash}"
+        
+        if model_name:
+            params_line += f", Model: {model_name}"
+        
+        if lora_hashes:
+            lora_str = ", ".join([f"{name}: {hash_val}" for name, hash_val in lora_hashes.items()])
+            params_line += f', Lora hashes: "{lora_str}"'
+        
+        params_line += ", Version: ComfyUI"
+        
+        parts.append(params_line)
+        
+        return "\n".join(parts)
+    
+    def _get_image_dimensions(self, tensor):
+        """Récupère les dimensions d'un tensor d'image"""
+        # tensor shape: [H, W, C]
+        if len(tensor.shape) >= 2:
+            height, width = tensor.shape[0], tensor.shape[1]
+            return int(width), int(height)
+        return None, None
     
     def _parse_date_tokens(self, text):
         """
@@ -264,78 +457,40 @@ class TOOSmartImageSaver:
             text = text.replace(token, value)
         
         return text
-    
-    def _extract_widget(self, prompt, node_name, widget_name):
-        """
-        Extrait la valeur d'un widget depuis le prompt.
-        Supporte deux modes:
-        - Par class_type: node_name="KSampler" cherche tous les nodes de ce type
-        - Par ID direct: node_name="#10" cible directement le node avec l'ID 10
-        """
-        if not prompt or not node_name or not widget_name:
-            return None
-        
-        # Mode #ID : cibler directement un node par son ID
-        if node_name.startswith("#"):
-            try:
-                target_id = node_name[1:]  # Enlever le #
-                if target_id in prompt:
-                    node_data = prompt[target_id]
-                    inputs = node_data.get("inputs", {})
-                    
-                    # Chercher le widget
-                    if widget_name in inputs:
-                        value = inputs[widget_name]
-                        return self._extract_value_from_input(value)
-            except:
-                pass
-            return None
-        
-        # Mode class_type : chercher par nom de classe (comportement original)
-        for node_id in prompt:
-            node_data = prompt[node_id]
-            class_type = node_data.get("class_type", "")
-            
-            # Vérifier si c'est le bon type de node
-            if node_name.lower() in class_type.lower():
-                inputs = node_data.get("inputs", {})
-                
-                # Chercher le widget
-                if widget_name in inputs:
-                    value = inputs[widget_name]
-                    return self._extract_value_from_input(value)
-        
-        return None
-    
-    def _extract_value_from_input(self, value):
-        """Extrait la valeur d'un input selon son type"""
-        if isinstance(value, dict):
-            if "on" in value and not value.get("on", True):
-                return None
-            # Extraire la première valeur non-"on"
-            for key, val in value.items():
-                if key != "on" and val:
-                    return str(val)
-        elif not isinstance(value, (list, dict)):
-            return str(value)
-        return None
-    
     def _clean_model_name(self, model_name):
         """
         Nettoie le nom du modèle:
         - Retire l'extension .safetensors, .ckpt, .pt
-        - Retire le chemin si présent
+        - Retire le chemin si présent (Windows et Unix)
+        - Nettoie les espaces et retours à la ligne
         """
-        # Retirer le chemin (Windows et Unix)
+        if not model_name:
+            return model_name
+            
+        # Retirer tous les espaces, retours à la ligne, et caractères invisibles
+        model_name = model_name.strip()
+        
+        # Normaliser les séparateurs de chemin (remplacer \ par /)
+        # pour que os.path.basename fonctionne sur tous les systèmes
+        model_name = model_name.replace('\\', '/')
+        
+        # Retirer le chemin
         model_name = os.path.basename(model_name)
         
-        # Retirer les extensions connues
-        extensions = ['.safetensors', '.ckpt', '.pt', '.pth', '.bin']
-        for ext in extensions:
-            if model_name.lower().endswith(ext):
-                model_name = model_name[:-len(ext)]
-                break
+        # Re-strip après basename au cas où
+        model_name = model_name.strip()
         
+        # Utiliser splitext pour retirer l'extension, puis vérifier si c'est une extension connue
+        name_without_ext, ext = os.path.splitext(model_name)
+        
+        # Liste des extensions connues (en minuscules)
+        known_extensions = ['.safetensors', '.ckpt', '.pt', '.pth', '.bin']
+        
+        # Si l'extension est dans la liste, on retourne le nom sans extension
+        if ext.lower() in known_extensions:
+            return name_without_ext.strip()  # Strip final pour être sûr
+        
+        # Sinon, on retourne le nom complet (peut-être que ce n'était pas vraiment une extension de modèle)
         return model_name
     
     def _tensor_to_pil(self, tensor):

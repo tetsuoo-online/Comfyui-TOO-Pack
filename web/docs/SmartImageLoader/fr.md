@@ -12,7 +12,6 @@ Un chargeur d'images flexible qui supporte plusieurs sources d'entrée avec ordr
 - **Ordre de priorité** intelligent et configurable
 - **Sélection aléatoire** avec seed reproductible
 - **Formats multiples** supportés (PNG, JPG, JPEG, BMP, WEBP, TIFF)
-- **Gestion d'erreurs** robuste
 - **Retour du chemin** du fichier chargé
 
 ---
