@@ -2,6 +2,8 @@
 Comfyui-TOO-Pack
 A custom nodes pack for ComfyUI
 """
+from .server_routes import *  # ← Important: avant les nodes!
+
 from .nodes.image.smart_image_loader import NODE_CLASS_MAPPINGS as SMART_IMAGE_LOADER_MAPPINGS, NODE_DISPLAY_NAME_MAPPINGS as SMART_IMAGE_LOADER_DISPLAY_MAPPINGS
 from .nodes.image.smart_image_saver import NODE_CLASS_MAPPINGS as SMART_IMAGE_SAVER_MAPPINGS, NODE_DISPLAY_NAME_MAPPINGS as SMART_IMAGE_SAVER_DISPLAY_MAPPINGS
 from .nodes.image.too_image_metadata import NODE_CLASS_MAPPINGS as TOO_IMAGE_METADATA_MAPPINGS, NODE_DISPLAY_NAME_MAPPINGS as TOO_IMAGE_METADATA_DISPLAY_MAPPINGS
