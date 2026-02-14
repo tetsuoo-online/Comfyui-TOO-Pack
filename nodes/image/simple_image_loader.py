@@ -1,5 +1,4 @@
 import os
-import random
 import torch
 import numpy as np
 from PIL import Image
@@ -8,39 +7,27 @@ import piexif.helper
 import re
 import json
 
-class SmartImageLoader:
+class TOOSimpleImageLoader:
     """
-    Charge une image selon la priorité : image input > txt_path > img_path > img_directory
-    - IMAGE output: priorité à l'entrée image, sinon chargée depuis les widgets
-    - metadata/workflow: toujours extraits des fichiers (widgets)
-    Retourne l'image + le chemin du fichier + metadata + workflow
+    Simple image loader: loads from img_path or image input
+    Returns image + file path + metadata + workflow
     """
 
     @classmethod
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff}),
-                "img_dir_level": ("INT", {
-                    "default": 0, 
-                    "min": -1, 
-                    "max": 10,
-                    "tooltip": "Directory depth: -1=all subdirs, 0=current only, 1-10=levels deep"
-                }),
                 "show_preview": ("BOOLEAN", {
                     "default": True,
                     "tooltip": "Show image preview in the node"
                 }),
             },
             "optional": {
-                "txt_path": ("STRING", {"default": "", "multiline": False,
-                "tooltip": "Path to a text file containing image paths (one per line)"
-                }),
-                "img_path": ("STRING", {"default": "", "multiline": False,
-                "tooltip": "Direct path to an image file"
-                }),
-                "img_directory": ("STRING", {"default": "", "multiline": False,
-                "tooltip": "Path to a directory containing images"
+                "img_path": ("STRING", {
+                    "default": "",
+                    "multiline": False,
+                    "vhs_path_extensions": ['png', 'jpg', 'jpeg', 'bmp', 'webp', 'tiff'],
+                    "tooltip": "Direct path to an image file"
                 }),
                 "image": ("IMAGE",),
             }
@@ -48,137 +35,55 @@ class SmartImageLoader:
 
     RETURN_TYPES = ("IMAGE", "STRING", "METADATA", "WORKFLOW")
     RETURN_NAMES = ("IMAGE", "FILE_PATH", "metadata", "workflow")
-    FUNCTION = "load_smart"
+    FUNCTION = "load_simple"
     CATEGORY = "🔵TOO-Pack/image"
 
-    def load_smart(self, seed, img_dir_level=0, show_preview=True, txt_path="", img_path="", img_directory="", image=None):
+    def load_simple(self, show_preview=True, img_path="", image=None):
         """
-        Charge une image selon l'ordre de priorité et extrait ses métadonnées et workflow.
-        - IMAGE output: from image input (priority) or from widgets (txt_path/img_path/img_directory)
-        - metadata/workflow output: always from widgets (if provided)
+        Load an image from image input or img_path.
+        - IMAGE output: from image input (priority) or img_path
+        - metadata/workflow output: always from img_path (if provided)
         """
         file_path = "none"
         loaded_image = None
         metadata = {}
         workflow = {}
 
-        # Priorité 1 : txt_path (fichier texte avec liste de chemins)
-        if txt_path and txt_path.strip() and os.path.exists(txt_path):
-            try:
-                with open(txt_path, 'r', encoding='utf-8') as f:
-                    lines = [line.strip() for line in f.readlines() if line.strip()]
-                if lines:
-                    random.seed(seed)
-                    file_path = random.choice(lines)
-                    metadata = self._extract_metadata(file_path)
-                    workflow = self._extract_workflow(file_path)
-                    
-                    # Load image from file only if no image input
-                    if image is None:
-                        loaded_image = self._load_image_from_path(file_path)
-                        if loaded_image is not None:
-                            return (loaded_image, file_path, metadata, workflow)
-                    else:
-                        # Use image input for IMAGE output
-                        return (image, file_path, metadata, workflow)
-            except Exception as e:
-                print(f"SmartImageLoader: Error reading txt_path '{txt_path}': {e}")
-
-        # Priorité 2 : img_path (chemin direct vers une image)
+        # Extract metadata and workflow from img_path (if provided)
         if img_path and img_path.strip() and os.path.exists(img_path):
-            try:
-                file_path = img_path
-                metadata = self._extract_metadata(file_path)
-                workflow = self._extract_workflow(file_path)
-                
-                # Load image from file only if no image input
-                if image is None:
+            file_path = img_path
+            metadata = self._extract_metadata(file_path)
+            workflow = self._extract_workflow(file_path)
+            
+            # If no image input, load the image from img_path
+            if image is None:
+                try:
                     loaded_image = self._load_image_from_path(img_path)
                     if loaded_image is not None:
                         return (loaded_image, file_path, metadata, workflow)
-                else:
-                    # Use image input for IMAGE output
-                    return (image, file_path, metadata, workflow)
-            except Exception as e:
-                print(f"SmartImageLoader: Error loading img_path '{img_path}': {e}")
+                except Exception as e:
+                    print(f"TOOSimpleImageLoader: Error loading img_path '{img_path}': {e}")
+                    raise ValueError(f"TOOSimpleImageLoader: Failed to load image from '{img_path}': {e}")
 
-        # Priorité 3 : img_directory (dossier avec images)
-        if img_directory and img_directory.strip() and os.path.isdir(img_directory):
-            try:
-                valid_extensions = ('.png', '.jpg', '.jpeg', '.bmp', '.webp', '.tiff')
-                image_files = []
-
-                if img_dir_level == -1:
-                    # Tous les sous-dossiers
-                    for root, dirs, files in os.walk(img_directory):
-                        for f in files:
-                            if f.lower().endswith(valid_extensions):
-                                image_files.append(os.path.join(root, f))
-                elif img_dir_level == 0:
-                    # Dossier courant uniquement
-                    image_files = [
-                        os.path.join(img_directory, f)
-                        for f in os.listdir(img_directory)
-                        if f.lower().endswith(valid_extensions) and os.path.isfile(os.path.join(img_directory, f))
-                    ]
-                else:
-                    # Profondeur spécifique
-                    image_files = self._get_images_at_depth(img_directory, img_dir_level, valid_extensions)
-
-                if image_files:
-                    random.seed(seed)
-                    file_path = random.choice(image_files)
-                    metadata = self._extract_metadata(file_path)
-                    workflow = self._extract_workflow(file_path)
-                    
-                    # Load image from file only if no image input
-                    if image is None:
-                        loaded_image = self._load_image_from_path(file_path)
-                        if loaded_image is not None:
-                            return (loaded_image, file_path, metadata, workflow)
-                    else:
-                        # Use image input for IMAGE output
-                        return (image, file_path, metadata, workflow)
-            except Exception as e:
-                print(f"SmartImageLoader: Error reading directory '{img_directory}': {e}")
-
-        # Priorité 4 : image input directe (si aucun widget n'a fourni de métadonnées)
+        # Use image input if provided
         if image is not None:
-            file_path = "external_input"
+            # If img_path was provided, file_path is already set and metadata/workflow extracted
+            # Otherwise, file_path remains "external_input" and metadata/workflow are empty
+            if file_path == "none":
+                file_path = "external_input"
             return (image, file_path, metadata, workflow)
 
-        # Aucune source valide trouvée
+        # No valid source found
         raise ValueError(
-            "SmartImageLoader: No valid image source found. "
-            "Please provide at least one of: image input, txt_path, img_path or img_directory."
+            "TOOSimpleImageLoader: No valid image source found. "
+            "Please provide either image input or img_path."
         )
-
-    def _get_images_at_depth(self, directory, max_depth, valid_extensions):
-        """Récupère les images jusqu'à une profondeur spécifique"""
-        image_files = []
-
-        def scan_directory(current_dir, current_depth):
-            if current_depth > max_depth:
-                return
-
-            try:
-                for item in os.listdir(current_dir):
-                    item_path = os.path.join(current_dir, item)
-                    if os.path.isfile(item_path) and item.lower().endswith(valid_extensions):
-                        image_files.append(item_path)
-                    elif os.path.isdir(item_path) and current_depth < max_depth:
-                        scan_directory(item_path, current_depth + 1)
-            except Exception as e:
-                print(f"SmartImageLoader: Error scanning '{current_dir}': {e}")
-
-        scan_directory(directory, 0)
-        return image_files
 
     def _extract_metadata(self, filepath):
         """
-        Extrait les métadonnées A1111/Civitai depuis l'image
-        PNG: depuis le chunk "parameters"
-        JPEG/WEBP: depuis l'EXIF UserComment
+        Extract A1111/Civitai metadata from image
+        PNG: from "parameters" chunk
+        JPEG/WEBP: from EXIF UserComment
         """
         metadata = {
             "model_name": "",
@@ -195,55 +100,55 @@ class SmartImageLoader:
         }
 
         try:
-            # Détecter le format
+            # Detect format
             ext = os.path.splitext(filepath)[1].lower()
             
             if ext == '.png':
-                # Pour PNG, lire le chunk "parameters"
+                # For PNG, read "parameters" chunk
                 try:
                     img = Image.open(filepath)
                     if hasattr(img, 'info') and 'parameters' in img.info:
                         user_comment = img.info['parameters']
                         metadata = self._parse_a111_params(user_comment)
                 except Exception as e:
-                    print(f"SmartImageLoader: No PNG metadata found in '{filepath}': {e}")
+                    print(f"TOOSimpleImageLoader: No PNG metadata found in '{filepath}': {e}")
             else:
-                # Pour JPEG/WEBP, utiliser EXIF
+                # For JPEG/WEBP, use EXIF
                 try:
                     exif_dict = piexif.load(filepath)
                     
-                    # Chercher dans ExifIFD.UserComment
+                    # Look in ExifIFD.UserComment
                     if "Exif" in exif_dict and piexif.ExifIFD.UserComment in exif_dict["Exif"]:
                         user_comment_raw = exif_dict["Exif"][piexif.ExifIFD.UserComment]
                         
                         try:
-                            # Décoder UserComment
+                            # Decode UserComment
                             user_comment = piexif.helper.UserComment.load(user_comment_raw)
                             metadata = self._parse_a111_params(user_comment)
                         except Exception as e:
-                            print(f"SmartImageLoader: Error decoding UserComment: {e}")
+                            print(f"TOOSimpleImageLoader: Error decoding UserComment: {e}")
                 except Exception as e:
-                    print(f"SmartImageLoader: No EXIF metadata found in '{filepath}': {e}")
-            
+                    print(f"TOOSimpleImageLoader: No EXIF metadata found in '{filepath}': {e}")
+                    
         except Exception as e:
-            print(f"SmartImageLoader: Error reading metadata from '{filepath}': {e}")
+            print(f"TOOSimpleImageLoader: Error reading metadata from '{filepath}': {e}")
         
         return metadata
 
     def _extract_workflow(self, filepath):
         """
-        Extrait le workflow ComfyUI depuis l'image
-        PNG: depuis les chunks "workflow" et "prompt"
-        JPEG/WEBP: depuis les tags EXIF Make/Model
+        Extract ComfyUI workflow from image
+        PNG: from PNG chunks (prompt, workflow, etc.)
+        JPEG/WEBP: from EXIF Make/Model tags
         """
         workflow = {}
 
         try:
-            # Détecter le format
+            # Detect format
             ext = os.path.splitext(filepath)[1].lower()
             
             if ext == '.png':
-                # Pour PNG, lire les chunks
+                # For PNG, read all chunks except "parameters"
                 try:
                     img = Image.open(filepath)
                     if hasattr(img, 'info'):
@@ -256,7 +161,7 @@ class SmartImageLoader:
                                     prompt = json.loads(value)
                                 except:
                                     pass
-                            elif key != "parameters":  # Ignorer "parameters" qui contient les métadonnées A1111
+                            elif key != "parameters":  # Ignore "parameters" which contains A1111 metadata
                                 try:
                                     extra_pnginfo[key] = json.loads(value)
                                 except:
@@ -267,14 +172,14 @@ class SmartImageLoader:
                         if prompt:
                             workflow["prompt"] = prompt
                 except Exception as e:
-                    print(f"SmartImageLoader: No PNG workflow found in '{filepath}': {e}")
+                    print(f"TOOSimpleImageLoader: No PNG workflow found in '{filepath}': {e}")
             else:
-                # Pour JPEG/WEBP, utiliser EXIF
+                # For JPEG/WEBP, use EXIF
                 try:
                     exif_dict = piexif.load(filepath)
                     
                     if "0th" in exif_dict:
-                        # Reconstituer extra_pnginfo et prompt
+                        # Reconstruct extra_pnginfo and prompt
                         extra_pnginfo = {}
                         prompt = None
                         
@@ -282,7 +187,7 @@ class SmartImageLoader:
                             if isinstance(value, bytes):
                                 value = value.decode('utf-8', errors='ignore')
                             
-                            # Parser les tags au format "key:json"
+                            # Parse tags in "key:json" format
                             if isinstance(value, str) and ':' in value:
                                 key, json_str = value.split(':', 1)
                                 try:
@@ -299,17 +204,17 @@ class SmartImageLoader:
                         if prompt:
                             workflow["prompt"] = prompt
                 except Exception as e:
-                    print(f"SmartImageLoader: No EXIF workflow found in '{filepath}': {e}")
+                    print(f"TOOSimpleImageLoader: No EXIF workflow found in '{filepath}': {e}")
                     
         except Exception as e:
-            print(f"SmartImageLoader: Error reading workflow from '{filepath}': {e}")
+            print(f"TOOSimpleImageLoader: Error reading workflow from '{filepath}': {e}")
         
         return workflow
 
     def _parse_a111_params(self, params_text):
         """
-        Parse les paramètres au format A1111/Civitai.
-        Format attendu:
+        Parse A1111/Civitai format parameters.
+        Expected format:
         {positive}
         Negative prompt: {negative}
         Steps: X, Sampler: Y Z, CFG scale: X, Seed: X, Size: WxH, Model hash: X, Model: X, Lora hashes: "name: hash"
@@ -333,7 +238,7 @@ class SmartImageLoader:
 
         lines = params_text.split('\n')
         
-        # Trouver les indices des sections
+        # Find section indices
         negative_idx = -1
         params_idx = -1
         
@@ -344,7 +249,7 @@ class SmartImageLoader:
                 params_idx = i
                 break
         
-        # Extraire positive prompt (toutes les lignes avant "Negative prompt:" ou params)
+        # Extract positive prompt (all lines before "Negative prompt:" or params)
         if negative_idx != -1:
             positive_lines = lines[:negative_idx]
         elif params_idx != -1:
@@ -352,26 +257,26 @@ class SmartImageLoader:
         else:
             positive_lines = lines
         
-        # Joindre avec des espaces et nettoyer
+        # Join with spaces and clean
         metadata["positive"] = ' '.join(positive_lines).strip()
         
-        # Extraire negative prompt (entre "Negative prompt:" et params)
+        # Extract negative prompt (between "Negative prompt:" and params)
         if negative_idx != -1:
             if params_idx != -1:
                 negative_lines = lines[negative_idx:params_idx]
             else:
                 negative_lines = lines[negative_idx:]
             
-            # Retirer le préfixe "Negative prompt:" de la première ligne
+            # Remove "Negative prompt:" prefix from first line
             if negative_lines:
                 first_line = negative_lines[0]
                 if first_line.startswith("Negative prompt:"):
                     negative_lines[0] = first_line.replace("Negative prompt:", "", 1).strip()
                 
-                # Joindre avec des espaces
+                # Join with spaces
                 metadata["negative"] = ' '.join(negative_lines).strip()
         
-        # Parser la ligne de paramètres
+        # Parse parameters line
         if params_idx != -1:
             params_line = lines[params_idx]
             
@@ -420,7 +325,7 @@ class SmartImageLoader:
         return metadata
 
     def _load_image_from_path(self, path):
-        """Charge une image depuis un chemin et la convertit en tensor ComfyUI"""
+        """Load an image from path and convert to ComfyUI tensor"""
         try:
             img = Image.open(path)
             img = img.convert("RGB")
@@ -428,14 +333,13 @@ class SmartImageLoader:
             img_tensor = torch.from_numpy(img_array)[None,]
             return img_tensor
         except Exception as e:
-            print(f"SmartImageLoader: Error loading image '{path}': {e}")
+            print(f"TOOSimpleImageLoader: Error loading image '{path}': {e}")
             return None
 
-# Enregistrement du node
 NODE_CLASS_MAPPINGS = {
-    "SmartImageLoader": SmartImageLoader
+    "TOOSimpleImageLoader": TOOSimpleImageLoader
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "SmartImageLoader": "TOO Smart Image Loader"
+    "TOOSimpleImageLoader": "TOO Simple Image Loader"
 }

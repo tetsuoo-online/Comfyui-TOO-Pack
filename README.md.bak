@@ -3,7 +3,7 @@
 
 **Tetsuoo's custom nodes pack for ComfyUI**
 
-A collection of utility nodes designed to enhance your ComfyUI workflow with smart image loading, metadata management, widget extraction, Krita integration and more.
+A collection of utility nodes designed to enhance your ComfyUI workflow with smart image loading, Krita integration, widget extraction, and more.
 
 **Category:** `TOO-Pack`
 
@@ -47,7 +47,7 @@ git clone https://github.com/tetsuoo-online/Comfyui-TOO-Pack
 <details>
 <summary><b><span style="color:#60a5fa;">Click to expand full documentation</span></b></summary>
 
-A flexible image loader that supports multiple input sources with metadata extraction.
+A flexible image loader that supports multiple input sources with priority order.
 
 #### Features
 
@@ -55,9 +55,6 @@ A flexible image loader that supports multiple input sources with metadata extra
 - **Smart priority order** with configurable inputs
 - **Random selection** with reproducible seed
 - **Multiple formats** supported (PNG, JPG, JPEG, BMP, WEBP, TIFF)
-- 🖼️ **Image Preview**
-- 📊 **A1111/Civitai** metadata extraction
-- 🔄 **ComfyUI** workflow extraction
 - **Returns file path** of loaded image
 
 #### Parameters
@@ -66,37 +63,32 @@ A flexible image loader that supports multiple input sources with metadata extra
 
 | Parameter | Type | Description | Default |
 |-----------|------|-------------|---------|
-| **seed** | INT | Seed for reproducible random selection | `0` |
-| **img_dir_level** | INT | Subdirectory depth: -1=all, 0=current, 1-10=levels | `0` |
-| **show_preview** | BOOLEAN | Show image preview in the node | `True` |
+| **seed** | <span style="background-color:#1e4d3e;color:#34d399;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:0.9em;">INT</span> | Seed for reproducible random selection | `0` |
 
 **Optional Parameters**
 
 | Parameter | Type | Description | Default |
 |-----------|------|-------------|---------|
-| **txt_path** | STRING | Path to text file containing image paths | - |
-| **img_path** | STRING | Direct path to an image file | - |
-| **img_directory** | STRING | Path to directory containing images | - |
-| **image** | IMAGE | Direct image input (priority for IMAGE output) | - |
+| **txt_path** | <span style="background-color:#1e3a5f;color:#60a5fa;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:0.9em;">STRING</span> | Path to text file containing image paths | - |
+| **img_path** | <span style="background-color:#1e3a5f;color:#60a5fa;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:0.9em;">STRING</span> | Direct path to an image file | - |
+| **img_directory** | <span style="background-color:#1e3a5f;color:#60a5fa;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:0.9em;">STRING</span> | Path to directory containing images | - |
+| **image** | <span style="background-color:#7c2d12;color:#fb923c;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:0.9em;">IMAGE</span> | Direct image input | - |
 
 **Outputs**
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| **IMAGE** | IMAGE | The loaded image (from image input or widgets) |
-| **FILE_PATH** | STRING | Path of loaded file |
-| **metadata** | METADATA | A1111/Civitai metadata extracted from file |
-| **workflow** | WORKFLOW | ComfyUI workflow extracted from file |
+| **IMAGE** | <span style="background-color:#7c2d12;color:#fb923c;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:0.9em;">IMAGE</span> | The loaded image as tensor |
+| **FILE_PATH** | <span style="background-color:#1e3a5f;color:#60a5fa;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:0.9em;">STRING</span> | Path of loaded file ("external_input" or "none") |
 
 #### Priority Order
 
 The node loads images in this order (from highest to lowest priority):
 
-1. **image** ⚡ : Uses the provided image input (for passing images only - does not load metadata or workflow)
-2. **txt_path** 📄 : Randomly selects a path from text file
-3. **img_path** 🖼 : Loads the specific image file
-4. **img_directory** 📁 : Randomly selects an image from directory
-
+1. **txt_path** 📄 : Randomly selects a path from text file
+2. **img_path** 🖼 : Loads the specific image file
+3. **img_directory** 📁 : Randomly selects an image from directory
+4. **image** ⚡ : Uses the provided image input
 
 #### Usage Examples
 

@@ -59,327 +59,232 @@ app.registerExtension({
                 return r;
             };
 
-            // Système de picking de widget
+            // Fonction pour activer le mode picking
             nodeType.prototype.startPicking = function(targetWidget) {
                 const self = this;
                 const canvas = app.canvas;
                 const graph = app.graph;
                 
-                console.log("🔗 Picking mode activated");
+                console.log("🔗 Picking mode activated - Click on a node to select a widget");
                 
-                // Changer le curseur du document
-                const originalCursor = document.body.style.cursor;
-                document.body.style.cursor = "url('web/link.png')";
-                
-                // Overlay semi-transparent
+                // Créer un overlay qui capture tous les clics
                 const overlay = document.createElement("div");
                 overlay.id = "widget-picker-overlay";
-                overlay.style.cssText = `
-                    position: fixed;
-                    top: 0;
-                    left: 0;
-                    width: 100%;
-                    height: 100%;
-                    background-color: rgba(0, 0, 0, 0);
-                    z-index: 9997;
-                    pointer-events: none;
-                `;
+                overlay.style.position = "fixed";
+                overlay.style.top = "0";
+                overlay.style.left = "0";
+                overlay.style.width = "100%";
+                overlay.style.height = "100%";
+                overlay.style.zIndex = "9998";
+                overlay.style.cursor = "url('data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"black\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71\"/><path d=\"M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71\"/></svg>') 0 24, auto";
+                overlay.style.backgroundColor = "rgba(74, 158, 255, 0.05)";
                 
-                // Message d'instruction
+                // Texte d'instruction
                 const instruction = document.createElement("div");
-                instruction.style.cssText = `
-                    position: fixed;
-                    top: 20px;
-                    left: 50%;
-                    transform: translateX(-50%);
-                    background-color: rgba(74, 158, 255, 0.95);
-                    color: #fff;
-                    padding: 12px 24px;
-                    border-radius: 8px;
-                    font-size: 14px;
-                    font-weight: bold;
-                    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-                    z-index: 9999;
-                    pointer-events: none;
-                `;
-                instruction.innerHTML = "🔗 Click on a node to pick a widget &nbsp;•&nbsp; ESC to cancel";
-                
-                // Canvas pour dessiner les overlays rouges
-                const overlayCanvas = document.createElement("canvas");
-                overlayCanvas.id = "widget-picker-canvas";
-                overlayCanvas.style.cssText = `
-                    position: fixed;
-                    top: 0;
-                    left: 0;
-                    width: 100%;
-                    height: 100%;
-                    z-index: 9998;
-                    
-                    cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="%234a9eff" d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></svg>') 12 12, pointer;	//ne marche pas - affiche le cursor mais désactive le picking
-                `;
-                overlayCanvas.width = window.innerWidth;
-                overlayCanvas.height = window.innerHeight;
+                instruction.style.position = "fixed";
+                instruction.style.top = "20px";
+                instruction.style.left = "50%";
+                instruction.style.transform = "translateX(-50%)";
+                instruction.style.backgroundColor = "rgba(74, 158, 255, 0.95)";
+                instruction.style.color = "#fff";
+                instruction.style.padding = "12px 24px";
+                instruction.style.borderRadius = "8px";
+                instruction.style.fontSize = "14px";
+                instruction.style.fontWeight = "bold";
+                instruction.style.boxShadow = "0 4px 12px rgba(0,0,0,0.3)";
+                instruction.style.zIndex = "9999";
+                instruction.textContent = "🔗 Click on a node to pick a widget (ESC to cancel)";
                 
                 document.body.appendChild(overlay);
                 document.body.appendChild(instruction);
-                document.body.appendChild(overlayCanvas);
                 
-                // Fonction pour dessiner les rectangles rouges
-                const drawRedOverlays = () => {
-                    const ctx = overlayCanvas.getContext("2d");
-                    ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+                // Handler pour le clic sur l'overlay
+                const clickHandler = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
                     
-                    const canvasRect = canvas.canvas.getBoundingClientRect();
+                    // Récupérer le canvas element
+                    const canvasElement = canvas.canvas;
+                    const rect = canvasElement.getBoundingClientRect();
+                    
+                    // Coordonnées relatives au canvas
+                    const x = e.clientX - rect.left;
+                    const y = e.clientY - rect.top;
+                    
+                    // Coordonnées dans le graph (tenir compte du zoom et du pan)
+                    const graphX = x / canvas.ds.scale - canvas.ds.offset[0];
+                    const graphY = y / canvas.ds.scale - canvas.ds.offset[1];
+                    
+                    console.log("Click at:", { x, y, graphX, graphY });
+                    
+                    // Trouver le node à cette position
+                    let foundNode = null;
                     const nodes = graph._nodes || [];
                     
-                    nodes.forEach(node => {
-                        if (!node) return;
+                    for (let i = nodes.length - 1; i >= 0; i--) {
+                        const node = nodes[i];
+                        if (!node) continue;
                         
-                        // Vérifier si le node a des widgets sélectionnables
-                        const widgets = node.widgets || [];
-                        const hasSelectable = widgets.some(w => 
+                        // Vérifier si le clic est dans le node
+                        if (graphX >= node.pos[0] && 
+                            graphX <= node.pos[0] + node.size[0] &&
+                            graphY >= node.pos[1] &&
+                            graphY <= node.pos[1] + node.size[1]) {
+                            foundNode = node;
+                            console.log("Found node:", node.title || node.type);
+                            break;
+                        }
+                    }
+                    
+                    // Nettoyer l'overlay et l'instruction
+                    document.body.removeChild(overlay);
+                    document.body.removeChild(instruction);
+                    document.removeEventListener("keydown", escHandler);
+                    
+                    if (foundNode && foundNode !== self) {
+                        // Récupérer les widgets sélectionnables
+                        const widgets = foundNode.widgets || [];
+                        const selectableWidgets = widgets.filter(w => 
                             w.type !== "button" && 
                             w.name && 
                             !w.name.startsWith("▶") && 
                             !w.name.startsWith("▼")
                         );
                         
-                        // Si pas sélectionnable OU c'est le node lui-même, dessiner en rouge
-                        if (!hasSelectable || node === self) {
-                            const x = canvasRect.left + (node.pos[0] + canvas.ds.offset[0]) * canvas.ds.scale;
-                            const y = canvasRect.top + (node.pos[1] + canvas.ds.offset[1]) * canvas.ds.scale;
-                            const w = node.size[0] * canvas.ds.scale;
-                            const h = node.size[1] * canvas.ds.scale;
-                            
-                            ctx.fillStyle = "rgba(100, 20, 20, 0.5)";
-                            ctx.fillRect(x, y, w, h);
-                        }
-                    });
-                };
-                
-                // Animation loop
-                const animate = () => {
-                    if (document.getElementById("widget-picker-overlay")) {
-                        drawRedOverlays();
-                        self.pickingAnimation = requestAnimationFrame(animate);
-                    }
-                };
-                animate();
-                
-                // Click handler
-                const handleClick = (e) => {
-                    console.log("Handler called, button:", e.button);
-                    
-                    if (e.button !== 0) return; // Seulement left-click
-                    
-                    e.preventDefault();
-                    e.stopPropagation();
-                    e.stopImmediatePropagation();
-                    
-                    const rect = canvas.canvas.getBoundingClientRect();
-                    const x = e.clientX - rect.left;
-                    const y = e.clientY - rect.top;
-                    const graphX = x / canvas.ds.scale - canvas.ds.offset[0];
-                    const graphY = y / canvas.ds.scale - canvas.ds.offset[1];
-                    
-                    console.log("Click at graph coords:", {graphX, graphY, scale: canvas.ds.scale});
-                    console.log("Self node ID:", self.id, "Title:", self.title || self.type);
-                    
-                    // Trouver le node
-                    const nodes = graph._nodes || [];
-                    let foundNode = null;
-                    
-                    for (let i = nodes.length - 1; i >= 0; i--) {
-                        const node = nodes[i];
-                        if (!node) continue;
-                        
-                        if (graphX >= node.pos[0] && graphX <= node.pos[0] + node.size[0] &&
-                            graphY >= node.pos[1] && graphY <= node.pos[1] + node.size[1]) {
-                            foundNode = node;
-                            console.log("Found node:", node.title || node.type, "ID:", node.id, "at", node.pos);
-                            break;
-                        }
-                    }
-                    
-                    if (foundNode && foundNode.id !== self.id) {
-                        console.log("Node is different from self, checking widgets...");
-                        const widgets = foundNode.widgets || [];
-                        console.log("Total widgets:", widgets.length);
-                        
-                        const selectable = widgets.filter(w => {
-                            const isSelectable = w.type !== "button" && 
-                                w.name && 
-                                !w.name.startsWith("▶") && 
-                                !w.name.startsWith("▼");
-                            if (isSelectable) {
-                                console.log("  - Selectable:", w.name, "type:", w.type);
-                            }
-                            return isSelectable;
-                        });
-                        
-                        console.log("Node has", selectable.length, "selectable widgets");
-                        
-                        if (selectable.length > 0) {
-                            cleanup();
-                            self.showWidgetSelector(foundNode, selectable, targetWidget);
+                        if (selectableWidgets.length === 0) {
+                            alert("This node has no selectable widgets");
                             return;
-                        } else {
-                            console.log("Node has no selectable widgets, cancelling");
                         }
-                    } else if (foundNode) {
-                        console.log("Found node is self (same ID), ignoring");
-                    } else {
-                        console.log("No node found at click position");
+                        
+                        // Afficher le sélecteur de widget
+                        self.showWidgetSelector(foundNode, selectableWidgets, targetWidget);
                     }
-                    
-                    cleanup();
                 };
                 
-                // ESC handler
-                const handleEsc = (e) => {
+                // Handler pour ESC
+                const escHandler = (e) => {
                     if (e.key === "Escape") {
                         console.log("Picking cancelled");
-                        cleanup();
+                        document.body.removeChild(overlay);
+                        document.body.removeChild(instruction);
+                        document.removeEventListener("keydown", escHandler);
                     }
                 };
                 
-                // Cleanup function
-                const cleanup = () => {
-                    // Restaurer le curseur
-                    document.body.style.cursor = originalCursor;
-                    
-                    // Annuler le timeout si pas encore déclenché
-                    if (clickHandlerTimeout) {
-                        clearTimeout(clickHandlerTimeout);
-                    }
-                    
-                    if (self.pickingAnimation) {
-                        cancelAnimationFrame(self.pickingAnimation);
-                        self.pickingAnimation = null;
-                    }
-                    
-                    const elements = [
-                        document.getElementById("widget-picker-overlay"),
-                        document.getElementById("widget-picker-canvas"),
-                        instruction
-                    ];
-                    
-                    elements.forEach(el => {
-                        if (el && el.parentNode) {
-                            el.parentNode.removeChild(el);
-                        }
-                    });
-                    
-                    canvas.canvas.removeEventListener("click", handleClick, true);
-                    document.removeEventListener("keydown", handleEsc);
-                };
-                
-                document.addEventListener("keydown", handleEsc);
-                
-                // Attendre un court instant avant d'activer le click handler
-                // pour éviter que le clic sur le bouton Pick ne soit capturé
-                let clickHandlerTimeout = setTimeout(() => {
-                    canvas.canvas.addEventListener("click", handleClick, true);
-                    console.log("Click handler activated");
-                }, 100);
+                overlay.addEventListener("click", clickHandler);
+                document.addEventListener("keydown", escHandler);
             };
             
-            // Popup de sélection de widget
+            // Fonction pour afficher le sélecteur de widget
             nodeType.prototype.showWidgetSelector = function(sourceNode, widgets, targetWidget) {
+                // Créer un popup HTML
                 const popup = document.createElement("div");
-                popup.style.cssText = `
-                    position: fixed;
-                    left: 50%;
-                    top: 50%;
-                    transform: translate(-50%, -50%);
-                    background-color: #2a2a2a;
-                    border: 2px solid #555;
-                    border-radius: 8px;
-                    padding: 20px;
-                    z-index: 10000;
-                    min-width: 300px;
-                    max-width: 500px;
-                    max-height: 600px;
-                    overflow-y: auto;
-                    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-                `;
+                popup.style.position = "fixed";
+                popup.style.left = "50%";
+                popup.style.top = "50%";
+                popup.style.transform = "translate(-50%, -50%)";
+                popup.style.backgroundColor = "#2a2a2a";
+                popup.style.border = "2px solid #555";
+                popup.style.borderRadius = "8px";
+                popup.style.padding = "20px";
+                popup.style.zIndex = "10000";
+                popup.style.minWidth = "300px";
+                popup.style.maxWidth = "500px";
+                popup.style.maxHeight = "600px";
+                popup.style.overflowY = "auto";
+                popup.style.boxShadow = "0 4px 20px rgba(0,0,0,0.5)";
                 
+                // Titre
                 const title = document.createElement("div");
                 title.textContent = `Select widget from: ${sourceNode.title || sourceNode.type}`;
-                title.style.cssText = `
-                    color: #fff;
-                    font-size: 16px;
-                    font-weight: bold;
-                    margin-bottom: 15px;
-                    border-bottom: 1px solid #555;
-                    padding-bottom: 10px;
-                `;
+                title.style.color = "#fff";
+                title.style.fontSize = "16px";
+                title.style.fontWeight = "bold";
+                title.style.marginBottom = "15px";
+                title.style.borderBottom = "1px solid #555";
+                title.style.paddingBottom = "10px";
                 popup.appendChild(title);
                 
-                widgets.forEach(widget => {
+                // Liste des widgets
+                const list = document.createElement("div");
+                widgets.forEach((widget, index) => {
+                    if (widget.type === "button" || !widget.name) return;
+                    
                     const item = document.createElement("div");
                     item.textContent = `${widget.name} (${widget.type})`;
-                    item.style.cssText = `
-                        padding: 10px;
-                        margin: 5px 0;
-                        background-color: #3a3a3a;
-                        color: #fff;
-                        cursor: pointer;
-                        border-radius: 4px;
-                        transition: background-color 0.2s;
-                    `;
+                    item.style.padding = "10px";
+                    item.style.margin = "5px 0";
+                    item.style.backgroundColor = "#3a3a3a";
+                    item.style.color = "#fff";
+                    item.style.cursor = "pointer";
+                    item.style.borderRadius = "4px";
+                    item.style.transition = "background-color 0.2s";
                     
-                    item.onmouseover = () => item.style.backgroundColor = "#4a4a4a";
-                    item.onmouseout = () => item.style.backgroundColor = "#3a3a3a";
+                    item.onmouseover = () => {
+                        item.style.backgroundColor = "#4a4a4a";
+                    };
+                    
+                    item.onmouseout = () => {
+                        item.style.backgroundColor = "#3a3a3a";
+                    };
                     
                     item.onclick = () => {
+                        // Construire la référence #id:widget
                         const reference = `#${sourceNode.id}:${widget.name}`;
+                        
+                        // Mettre à jour le widget cible
                         if (targetWidget.callback) {
                             targetWidget.callback(reference);
                         }
                         targetWidget.value = reference;
+                        
+                        // Forcer le rafraîchissement
                         this.setDirtyCanvas(true, true);
+                        
+                        // Fermer le popup
                         document.body.removeChild(popup);
-                        document.body.removeChild(bgOverlay);
+                        document.body.removeChild(overlay);
                     };
                     
-                    popup.appendChild(item);
+                    list.appendChild(item);
                 });
+                popup.appendChild(list);
                 
+                // Bouton annuler
                 const cancelBtn = document.createElement("button");
                 cancelBtn.textContent = "Cancel";
-                cancelBtn.style.cssText = `
-                    margin-top: 15px;
-                    padding: 8px 20px;
-                    background-color: #555;
-                    color: #fff;
-                    border: none;
-                    border-radius: 4px;
-                    cursor: pointer;
-                    width: 100%;
-                `;
+                cancelBtn.style.marginTop = "15px";
+                cancelBtn.style.padding = "8px 20px";
+                cancelBtn.style.backgroundColor = "#555";
+                cancelBtn.style.color = "#fff";
+                cancelBtn.style.border = "none";
+                cancelBtn.style.borderRadius = "4px";
+                cancelBtn.style.cursor = "pointer";
+                cancelBtn.style.width = "100%";
+                
                 cancelBtn.onclick = () => {
                     document.body.removeChild(popup);
-                    document.body.removeChild(bgOverlay);
+                    document.body.removeChild(overlay);
                 };
+                
                 popup.appendChild(cancelBtn);
                 
-                const bgOverlay = document.createElement("div");
-                bgOverlay.style.cssText = `
-                    position: fixed;
-                    left: 0;
-                    top: 0;
-                    width: 100%;
-                    height: 100%;
-                    background-color: rgba(0,0,0,0.5);
-                    z-index: 9999;
-                `;
-                bgOverlay.onclick = () => {
+                // Overlay semi-transparent
+                const overlay = document.createElement("div");
+                overlay.style.position = "fixed";
+                overlay.style.left = "0";
+                overlay.style.top = "0";
+                overlay.style.width = "100%";
+                overlay.style.height = "100%";
+                overlay.style.backgroundColor = "rgba(0,0,0,0.5)";
+                overlay.style.zIndex = "9999";
+                
+                overlay.onclick = () => {
                     document.body.removeChild(popup);
-                    document.body.removeChild(bgOverlay);
+                    document.body.removeChild(overlay);
                 };
                 
-                document.body.appendChild(bgOverlay);
+                document.body.appendChild(overlay);
                 document.body.appendChild(popup);
             };
 
@@ -395,13 +300,18 @@ app.registerExtension({
                     });
                     w.serialize = false;
 
+                    // Style pour headers - transparent
                     w.computeSize = function(width) {
                         return [width, 22];
                     };
 
+                    const originalDraw = w.draw;
                     w.draw = function(ctx, node, widget_width, y, H) {
+                        // Fond noir à 5% d'opacité
                         ctx.fillStyle = "rgba(0, 0, 0, 0.06)";
                         ctx.fillRect(0, y, widget_width, H);
+
+                        // Texte blanc en gras
                         ctx.fillStyle = "#ffffff";
                         ctx.font = "bold 12px Arial";
                         ctx.fillText(this.label || this.name, 6, y + H * 0.7);
@@ -415,7 +325,9 @@ app.registerExtension({
                         return [width, 22];
                     };
 
+                    const originalDraw = widget.draw;
                     widget.draw = function(ctx, node, widget_width, y, H) {
+                        // Fond avec 20% d'opacité pour boutons rouge et vert
                         if (bgColor === "#3a1a1a") {
                             ctx.fillStyle = "rgba(255, 68, 68, 0.05)";
                         } else if (bgColor === "#1a3a1a") {
@@ -425,6 +337,7 @@ app.registerExtension({
                         }
                         ctx.fillRect(2, y + 1, widget_width - 4, H - 2);
 
+                        // Texte
                         ctx.fillStyle = textColor;
                         ctx.font = "12px Arial";
                         ctx.textAlign = "center";
@@ -433,21 +346,26 @@ app.registerExtension({
                     };
                 };
                 
-                const addTextWithPicker = (label, value, callback) => {
-                    const textWidget = this.addWidget("text", label, value, callback);
+                // Fonction helper pour ajouter un widget text avec bouton picker
+                const addTextWidgetWithPicker = (name, value, callback) => {
+                    const textWidget = this.addWidget("text", name, value, callback);
                     
+                    // Ajouter un bouton picker
                     const pickerBtn = this.addWidget("button", "🔗 Pick", null, () => {
                         this.startPicking(textWidget);
                     });
                     pickerBtn.serialize = false;
                     
+                    // Style du bouton picker
                     pickerBtn.computeSize = function(width) {
                         return [width, 20];
                     };
                     
+                    const originalDraw = pickerBtn.draw;
                     pickerBtn.draw = function(ctx, node, widget_width, y, H) {
                         ctx.fillStyle = "rgba(68, 138, 255, 0.1)";
                         ctx.fillRect(2, y + 1, widget_width - 4, H - 2);
+                        
                         ctx.fillStyle = "#4a9eff";
                         ctx.font = "11px Arial";
                         ctx.textAlign = "center";
@@ -468,9 +386,13 @@ app.registerExtension({
                             this.data_fields[i].name = v;
                         });
 
-                        addTextWithPicker(`value (text or #id:widget)`, field.value || "", (v) => {
-                            this.data_fields[i].value = v;
-                        });
+                        addTextWidgetWithPicker(
+                            `value (text or #id:widget)`, 
+                            field.value || "", 
+                            (v) => {
+                                this.data_fields[i].value = v;
+                            }
+                        );
 
                         const delBtn = this.addWidget("button", "❌", null, () => {
                             this.data_fields.splice(i, 1);
@@ -499,9 +421,13 @@ app.registerExtension({
                 // MODEL
                 const modelCollapsed = addHeader("MODEL", "model_collapsed");
                 if (!modelCollapsed) {
-                    addTextWithPicker("extract (#id:widget)", this.properties.model_extract, (v) => {
-                        this.properties.model_extract = v;
-                    });
+                    addTextWidgetWithPicker(
+                        "extract (#id:widget)", 
+                        this.properties.model_extract, 
+                        (v) => {
+                            this.properties.model_extract = v;
+                        }
+                    );
                 }
 
                 // LORAS
@@ -509,9 +435,13 @@ app.registerExtension({
                 if (!lorasCollapsed) {
                     if (!this.properties.loras_extracts) this.properties.loras_extracts = [];
                     for (let i = 0; i < this.properties.loras_extracts.length; i++) {
-                        addTextWithPicker(`lora ${i}`, this.properties.loras_extracts[i], (v) => {
-                            this.properties.loras_extracts[i] = v;
-                        });
+                        addTextWidgetWithPicker(
+                            `lora ${i}`, 
+                            this.properties.loras_extracts[i], 
+                            (v) => {
+                                this.properties.loras_extracts[i] = v;
+                            }
+                        );
 
                         const delBtn = this.addWidget("button", "❌", null, () => {
                             this.properties.loras_extracts.splice(i, 1);

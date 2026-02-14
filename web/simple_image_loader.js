@@ -23,9 +23,9 @@ function fitHeight(node) {
 }
 
 app.registerExtension({
-    name: "TOO.SmartImageLoader.Preview",
+    name: "TOO.SimpleImageLoader.Preview",
     async beforeRegisterNodeDef(nodeType, nodeData, app) {
-        if (nodeData.name === "SmartImageLoader") {
+        if (nodeData.name === "TOOSimpleImageLoader") {
 
             chainCallback(nodeType.prototype, "onNodeCreated", function () {
                 const previewNode = this;
@@ -52,7 +52,7 @@ app.registerExtension({
 
                 previewWidget.value = { hidden: false, params: {}, enabled: true };
                 previewWidget.parentEl = document.createElement("div");
-                previewWidget.parentEl.className = "smart_image_loader_preview";
+                previewWidget.parentEl.className = "simple_image_loader_preview";
                 previewWidget.parentEl.style.width = "100%";
                 element.appendChild(previewWidget.parentEl);
 
@@ -105,12 +105,12 @@ app.registerExtension({
                 previewWidget.updateSource = function () {
                     // Don't load if disabled
                     if (!this.value.enabled) {
-                        console.log("SmartImageLoader: Preview disabled, not loading");
+                        console.log("TOOSimpleImageLoader: Preview disabled, not loading");
                         return;
                     }
 
                     if (this.value.params == undefined || !this.value.params.filename) {
-                        console.log("SmartImageLoader: No filename, not loading");
+                        console.log("TOOSimpleImageLoader: No filename, not loading");
                         return;
                     }
 
@@ -121,7 +121,7 @@ app.registerExtension({
 
                     // Use custom route /too/view/image
                     const url = api.apiURL('/too/view/image?' + new URLSearchParams(params));
-                    console.log("SmartImageLoader: Loading image from", params.filename);
+                    console.log("TOOSimpleImageLoader: Loading image from", params.filename);
 
                     this.imgEl.src = url;
                     this.imgEl.hidden = false;
@@ -134,7 +134,7 @@ app.registerExtension({
 
                 if (showPreviewWidget) {
                     chainCallback(showPreviewWidget, "callback", (value) => {
-                        console.log("SmartImageLoader: show_preview changed to", value);
+                        console.log("TOOSimpleImageLoader: show_preview changed to", value);
 
                         // Update enabled state
                         previewWidget.value.enabled = value;
@@ -144,14 +144,14 @@ app.registerExtension({
                             previewWidget.value.hidden = false;
                             previewWidget.parentEl.hidden = false;
 
-                            // Reload image with current params
+                            // Reload image with current params (including new path)
                             if (previewWidget.value.params && previewWidget.value.params.filename) {
-                                console.log("SmartImageLoader: Reloading with current params:", previewWidget.value.params.filename);
+                                console.log("TOOSimpleImageLoader: Reloading with current params:", previewWidget.value.params.filename);
                                 previewWidget.updateSource();
                             }
                         } else {
-                            // Disabled: clear visual preview
-                            console.log("SmartImageLoader: Clearing visual preview, keeping params");
+                            // Disabled: clear visual preview BUT keep params for when re-enabled
+                            console.log("TOOSimpleImageLoader: Clearing visual preview, keeping params");
                             previewWidget.clearPreview();
                         }
 
@@ -172,7 +172,7 @@ app.registerExtension({
 
                 if (imgPathWidget) {
                     chainCallback(imgPathWidget, "callback", (value) => {
-                        console.log("TOOSmartImageLoader: img_path changed to", value);
+                        console.log("TOOSimpleImageLoader: img_path changed to", value);
 
                         if (!value) {
                             // Clear params AND preview
@@ -183,7 +183,7 @@ app.registerExtension({
 
                         // Check toggle state
                         const showPreview = showPreviewWidget ? showPreviewWidget.value : true;
-                        console.log("TOOSmartImageLoader: show_preview is", showPreview);
+                        console.log("TOOSimpleImageLoader: show_preview is", showPreview);
 
                         // Create params (ALWAYS, even if preview OFF)
                         let params = {
@@ -196,7 +196,7 @@ app.registerExtension({
                         previewNode.updateParameters(params, showPreview); // force_update only if enabled
 
                         if (!showPreview) {
-                            console.log("TOOSMARTImageLoader: Preview disabled, params saved but not loading");
+                            console.log("TOOSimpleImageLoader: Preview disabled, params saved but not loading");
                         }
                     });
 
