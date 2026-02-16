@@ -324,6 +324,97 @@ class FileNaming:
                     return str(value) if value else ""
             return ""
 
+    def resolve_template_value(self, value, prompt, meta_dict, date_vars, any_values):
+        """Resolve template values with {...} syntax. Supports: {#id:widget}, {%date1}, {field}, {[any1]}, text"""
+        if not value or "{" not in value:
+            return self._resolve_simple(value, prompt, meta_dict, date_vars, any_values)
+        
+        import re
+        return re.sub(r'\{([^}]+)\}', 
+                      lambda m: self._resolve_token(m.group(1).strip(), prompt, meta_dict, date_vars, any_values) or m.group(0), 
+                      value)
+
+    def _resolve_simple(self, value, prompt, meta_dict, date_vars, any_values):
+        if not value:
+            return ""
+        
+        v = value.strip()
+        result = self._resolve_token(v, prompt, meta_dict, date_vars, any_values)
+        return result if result is not None else value
+
+    def _resolve_token(self, token, prompt, meta_dict, date_vars, any_values):
+        """Resolve a single token to its value or None if not found"""
+        # Check all sources in priority order
+        if token in any_values and any_values[token]:
+            result = self._convert_to_str(any_values[token])
+            # Clean paths if present (extract basename, remove extension)
+            if result and ('\\' in result or '/' in result or result.endswith(('.safetensors', '.ckpt', '.pt', '.pth', '.bin'))):
+                result = os.path.splitext(os.path.basename(result))[0]
+            return result if result else None
+        if token in date_vars and date_vars[token]:
+            return self._convert_to_str(date_vars[token])
+        if ":" in token and (token.startswith("#") or not token.startswith("%")):
+            extracted = self._extract_from_prompt(token, prompt)
+            if extracted:
+                result = self._convert_to_str(extracted)
+                # Auto-clean paths from model/lora widgets
+                if result and ('\\' in result or '/' in result or result.endswith(('.safetensors', '.ckpt', '.pt', '.pth', '.bin'))):
+                    result = os.path.splitext(os.path.basename(result))[0]
+                return result if result else None
+        if token in meta_dict and meta_dict[token]:
+            return self._convert_to_str(meta_dict[token])
+        return None
+    
+    def _resolve_token_raw(self, token, prompt, meta_dict, date_vars, any_values):
+        """Resolve token and return raw value (list or string) without conversion"""
+        if token in any_values and any_values[token]:
+            return any_values[token]
+        if token in date_vars and date_vars[token]:
+            return date_vars[token]
+        if ":" in token and (token.startswith("#") or not token.startswith("%")):
+            return self._extract_from_prompt(token, prompt)
+        if token in meta_dict and meta_dict[token]:
+            return meta_dict[token]
+        return None
+
+    def _convert_to_str(self, val):
+        """Convert value to string, handling lists from multiline widgets"""
+        if isinstance(val, list):
+            # Join with space and clean whitespace for A1111/Civitai compatibility
+            return " ".join(" ".join(str(v).split()) for v in val)
+        result = str(val) if val else ""
+        # Clean all whitespace (including \n) to single space
+        return " ".join(result.split())
+    
+    def resolve_for_metadata(self, value, prompt, meta_dict, date_vars, any_values):
+        """Resolve for metadata: extract ONLY content inside {...}, or resolve simple syntax"""
+        if not value:
+            return ""
+        
+        import re
+        # If {...} syntax, extract ONLY the first {...} content
+        match = re.search(r'\{([^}]+)\}', value)
+        if match:
+            return self._resolve_token(match.group(1).strip(), prompt, meta_dict, date_vars, any_values) or ""
+        
+        # No {...}, resolve normally (retrocompat)
+        return self._resolve_simple(value, prompt, meta_dict, date_vars, any_values)
+    
+    def resolve_for_metadata_raw(self, value, prompt, meta_dict, date_vars, any_values):
+        """Resolve for metadata but return raw value (list or string) without conversion"""
+        if not value:
+            return None
+        
+        import re
+        # If {...} syntax, extract ONLY the first {...} content
+        match = re.search(r'\{([^}]+)\}', value)
+        if match:
+            return self._resolve_token_raw(match.group(1).strip(), prompt, meta_dict, date_vars, any_values)
+        
+        # No {...}, resolve normally (retrocompat)
+        v = value.strip()
+        return self._resolve_token_raw(v, prompt, meta_dict, date_vars, any_values)
+
     def save_images(self, images, metadata=None, workflow=None, any1=None, any2=None, any3=None, prompt=None, extra_pnginfo=None):
         config = self._get_config(extra_pnginfo)
 
@@ -339,12 +430,21 @@ class FileNaming:
             "[any3]": any3_value
         }
 
+        # Pre-parse date variables
+        date_vars = {
+            "%date1": self._parse_date_tokens(config.get("date1", "")),
+            "%date2": self._parse_date_tokens(config.get("date2", "")),
+            "%date3": self._parse_date_tokens(config.get("date3", ""))
+        }
+
         # Build metadata dict from data_fields
         meta_dict = {}
+        naming_dict = {}  # Separate dict for naming with full templates resolved
         if metadata and isinstance(metadata, dict):
             meta_dict = metadata.copy()
+            naming_dict = metadata.copy()
 
-        # Extract data_fields values
+        # Extract data_fields values with template support
         data_fields = config.get("data_fields", [])
         for field in data_fields:
             name = field.get("name", "")
@@ -353,47 +453,42 @@ class FileNaming:
             if not name:
                 continue
 
-            # If value is [any1], [any2], or [any3], use the corresponding input value
-            if value.strip() in any_values:
-                value_from_any = any_values[value.strip()]
-                if value_from_any:
-                    meta_dict[name] = value_from_any
-            # If value contains extraction pattern (#id:widget or ClassName:widget)
-            elif value and ":" in value and (value.startswith("#") or not value.startswith("%")):
-                extracted = self._extract_from_prompt(value, prompt)
-                if extracted:
-                    # Handle both single values and lists (for multiline strings)
-                    if isinstance(extracted, list):
-                        meta_dict[name] = "\n".join(extracted)
-                    else:
-                        meta_dict[name] = extracted
-            # If value from metadata input
-            elif name in meta_dict:
-                pass  # Keep existing value
-            # If static value
-            elif value:
-                meta_dict[name] = value
+            # For metadata: extract only {...} content (clean)
+            resolved_meta = self.resolve_for_metadata(value, prompt, meta_dict, date_vars, any_values)
+            if resolved_meta:
+                meta_dict[name] = resolved_meta
+            
+            # For naming: resolve full template with prefix/suffix
+            resolved_naming = self.resolve_template_value(value, prompt, meta_dict, date_vars, any_values)
+            if resolved_naming:
+                naming_dict[name] = resolved_naming
 
         # Extract model if configured
         model_extract = config.get("model_extract", "")
         if model_extract:
-            # If model_extract is [any1], [any2], or [any3], use corresponding input value
-            if model_extract.strip() in any_values:
-                model_value = any_values[model_extract.strip()]
-            else:
-                model_value = self._extract_from_prompt(model_extract, prompt)
+            # For meta_dict: extract clean path
+            model_value = self.resolve_for_metadata_raw(model_extract, prompt, meta_dict, date_vars, any_values)
             
             if model_value:
-                model_name = os.path.splitext(os.path.basename(model_value))[0]
-                meta_dict["model"] = model_name
-                if "model_name" not in meta_dict:
-                    meta_dict["model_name"] = model_name
+                # Handle list case
+                if isinstance(model_value, list):
+                    model_value = model_value[0] if model_value else None
                 
-                # Calculate model hash
-                if "model_hash" not in meta_dict:
-                    model_hash = self._calculate_file_hash(model_value, 10)
-                    if model_hash:
-                        meta_dict["model_hash"] = model_hash
+                if model_value:
+                    model_name = os.path.splitext(os.path.basename(str(model_value)))[0]
+                    meta_dict["model"] = model_name
+                    # CORRECTION: Utiliser resolve_template_value pour préserver préfixes/suffixes
+                    naming_dict["model"] = self.resolve_template_value(model_extract, prompt, meta_dict, date_vars, any_values)
+                    if "model_name" not in meta_dict:
+                        meta_dict["model_name"] = model_name
+                        naming_dict["model_name"] = model_name
+                    
+                    # Calculate model hash
+                    if "model_hash" not in meta_dict:
+                        model_hash = self._calculate_file_hash(str(model_value), 10)
+                        if model_hash:
+                            meta_dict["model_hash"] = model_hash
+                            naming_dict["model_hash"] = model_hash
 
         # Extract loras if configured
         loras_extracts = config.get("loras_extracts", [])
@@ -401,34 +496,37 @@ class FileNaming:
         lora_hashes_dict = {}
         for lora_extract in loras_extracts:
             if lora_extract:
-                # If lora_extract is [any1], [any2], or [any3], use corresponding input value
-                if lora_extract.strip() in any_values:
-                    lora_value = any_values[lora_extract.strip()]
-                    # Split by newlines to handle multiple loras from any input
-                    if lora_value and isinstance(lora_value, str):
-                        lora_value = [line.strip() for line in lora_value.split('\n') if line.strip()]
-                else:
-                    lora_value = self._extract_from_prompt(lora_extract, prompt)
+                # For meta_dict: extract clean paths
+                lora_value = self.resolve_for_metadata_raw(lora_extract, prompt, meta_dict, date_vars, any_values)
                 
-                # Handle both single values and lists (for multiline strings)
+                # If string, split by newlines to handle multiple loras
+                if isinstance(lora_value, str):
+                    lora_value = [line.strip() for line in lora_value.split('\n') if line.strip()]
+                
                 lora_values = lora_value if isinstance(lora_value, list) else [lora_value] if lora_value else []
                 
                 for lora_val in lora_values:
                     if lora_val:
-                        lora_name = os.path.splitext(os.path.basename(lora_val))[0]
+                        lora_name = os.path.splitext(os.path.basename(str(lora_val)))[0]
                         lora_names.append(lora_name)
                         
-                        # Calculate lora hash (compatible Civitai/A1111 - excludes safetensors metadata)
-                        lora_hash = self._calculate_lora_hash(lora_val)
+                        # Calculate lora hash
+                        lora_hash = self._calculate_lora_hash(str(lora_val))
                         if lora_hash:
                             lora_hashes_dict[lora_name] = lora_hash
 
         if lora_names:
             meta_dict["loras"] = ", ".join(lora_names)
+            # CORRECTION: Pour les loras, garder la valeur résolue avec préfixes/suffixes
+            if loras_extracts and loras_extracts[0]:
+                naming_dict["loras"] = self.resolve_template_value(loras_extracts[0], prompt, meta_dict, date_vars, any_values)
+            else:
+                naming_dict["loras"] = ", ".join(lora_names)
         
         # Add lora_hashes to metadata if we calculated any
         if lora_hashes_dict and "lora_hashes" not in meta_dict:
             meta_dict["lora_hashes"] = lora_hashes_dict
+            naming_dict["lora_hashes"] = lora_hashes_dict
 
         # Apply text replacements by target
         replacements = config.get("text_replace_pairs", [])
@@ -444,26 +542,27 @@ class FileNaming:
             if target in any_values:
                 target = ""
             
-            # If target specified, only replace in that field
+            # Apply to meta_dict (for metadata)
             if target and target in meta_dict:
                 value = str(meta_dict[target])
                 meta_dict[target] = value.replace(input_str, output_str)
-            # If no target, replace in all fields
             elif not target:
                 for key in meta_dict:
                     value = str(meta_dict[key])
                     meta_dict[key] = value.replace(input_str, output_str)
+            
+            # Apply to naming_dict (for naming)
+            if target and target in naming_dict:
+                value = str(naming_dict[target])
+                naming_dict[target] = value.replace(input_str, output_str)
+            elif not target:
+                for key in naming_dict:
+                    value = str(naming_dict[key])
+                    naming_dict[key] = value.replace(input_str, output_str)
 
         # Build filename
         filename_parts = []
         separator = config.get("separator", "_")
-
-        # Pre-parse date variables (ONLY for %date1, %date2, etc.)
-        date_vars = {
-            "%date1": self._parse_date_tokens(config.get("date1", "")),
-            "%date2": self._parse_date_tokens(config.get("date2", "")),
-            "%date3": self._parse_date_tokens(config.get("date3", ""))
-        }
 
         output_folder = ""
         for field in ["output_folder", "prefix", "extra1", "extra2", "extra3", "model", "suffix"]:
@@ -471,25 +570,15 @@ class FileNaming:
             if not value:
                 continue
 
-            # If value is [any1], [any2], or [any3], use the corresponding input value
-            if value.strip() in any_values:
-                value_from_any = any_values[value.strip()]
-                if value_from_any:
-                    value = value_from_any
-                else:
-                    continue  # Skip if any not connected
-            # Replace date vars (%date1, %date2, etc.)
-            elif value in date_vars:
-                value = date_vars[value]
-            # Replace metadata field names with their values
-            elif value in meta_dict:
-                value = str(meta_dict[value])
-            # Otherwise keep as is (static text)
+            # Use naming_dict for lookups (contains full templates with prefix/suffix)
+            resolved = self.resolve_template_value(value, prompt, naming_dict, date_vars, any_values)
+            if not resolved:
+                continue
 
             if field == "output_folder":
-                output_folder = value
-            elif value:
-                filename_parts.append(value)
+                output_folder = resolved
+            else:
+                filename_parts.append(resolved)
 
         # Setup output dir
         output_dir = self.output_dir
@@ -699,6 +788,6 @@ NODE_CLASS_MAPPINGS = {
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "FileNaming (LiteGraph)": "💾 TOO Smart Image Saver (Advanced)(LiteGraph)",
+    "FileNaming (LiteGraph)": "💾 TOO Smart Image Saver (Advanced)",
     "FileNaming (DOM)": "💾 TOO Smart Image Saver (Advanced)(DOM)"
 }

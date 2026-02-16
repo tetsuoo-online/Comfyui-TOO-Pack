@@ -437,5 +437,5 @@ NODE_CLASS_MAPPINGS = {
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "SmartImageLoader": "TOO Smart Image Loader"
+    "SmartImageLoader": "TOO Smart Image Loader 🖼️"
 }

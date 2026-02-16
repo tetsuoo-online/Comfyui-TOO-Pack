@@ -1,4 +1,4 @@
-# 💾 TOO Smart Image Saver (Advanced)(LiteGraph)
+# 💾 TOO Smart Image Saver (Advanced)
 
 Node for saving images with advanced file naming and A1111/Civitai Auto V3 compatible metadata.
 

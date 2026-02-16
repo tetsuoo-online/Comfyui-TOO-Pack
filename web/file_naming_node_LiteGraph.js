@@ -39,7 +39,7 @@ app.registerExtension({
                     extra1: "",
                     extra2: "",
                     extra3: "",
-                    model: "",
+                    extra4: "",
                     suffix: "",
                     model_extract: "",
                     loras_extracts: [],
@@ -53,239 +53,274 @@ app.registerExtension({
                 }, this.properties);
 
                 // Ajouter de l'espace en haut du node pour les entrées
-                this.widgets_start_y = 125;
+                this.widgets_start_y = 100;
 
                 this.buildUI();
                 return r;
             };
 
-            // Système de picking de widget
-            nodeType.prototype.startPicking = function(targetWidget) {
-                const self = this;
-                const canvas = app.canvas;
-                const graph = app.graph;
-                
-                console.log("🔗 Picking mode activated");
-                
-                // Changer le curseur du document
-                const originalCursor = document.body.style.cursor;
-                document.body.style.cursor = "url('web/link.png')";
-                
-                // Overlay semi-transparent
-                const overlay = document.createElement("div");
-                overlay.id = "widget-picker-overlay";
-                overlay.style.cssText = `
-                    position: fixed;
-                    top: 0;
-                    left: 0;
-                    width: 100%;
-                    height: 100%;
-                    background-color: rgba(0, 0, 0, 0);
-                    z-index: 9997;
-                    pointer-events: none;
-                `;
-                
-                // Message d'instruction
-                const instruction = document.createElement("div");
-                instruction.style.cssText = `
-                    position: fixed;
-                    top: 20px;
-                    left: 50%;
-                    transform: translateX(-50%);
-                    background-color: rgba(74, 158, 255, 0.95);
-                    color: #fff;
-                    padding: 12px 24px;
-                    border-radius: 8px;
-                    font-size: 14px;
-                    font-weight: bold;
-                    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-                    z-index: 9999;
-                    pointer-events: none;
-                `;
-                instruction.innerHTML = "🔗 Click on a node to pick a widget &nbsp;•&nbsp; ESC to cancel";
-                
-                // Canvas pour dessiner les overlays rouges
-                const overlayCanvas = document.createElement("canvas");
-                overlayCanvas.id = "widget-picker-canvas";
-                overlayCanvas.style.cssText = `
-                    position: fixed;
-                    top: 0;
-                    left: 0;
-                    width: 100%;
-                    height: 100%;
-                    z-index: 9998;
-                    pointer-events: none;
-                    cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="%234a9eff" d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></svg>') 12 12, pointer;
-                `;
-                overlayCanvas.width = window.innerWidth;
-                overlayCanvas.height = window.innerHeight;
-                
-                document.body.appendChild(overlay);
-                document.body.appendChild(instruction);
-                document.body.appendChild(overlayCanvas);
-                
-                // Fonction pour dessiner les rectangles rouges
-                const drawRedOverlays = () => {
-                    const ctx = overlayCanvas.getContext("2d");
-                    ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
-                    
-                    const canvasRect = canvas.canvas.getBoundingClientRect();
-                    const nodes = graph._nodes || [];
-                    
-                    nodes.forEach(node => {
-                        if (!node) return;
-                        
-                        // Vérifier si le node a des widgets sélectionnables
-                        const widgets = node.widgets || [];
-                        const hasSelectable = widgets.some(w => 
-                            w.type !== "button" && 
-                            w.name && 
-                            !w.name.startsWith("▶") && 
-                            !w.name.startsWith("▼")
-                        );
-                        
-                        // Si pas sélectionnable OU c'est le node lui-même, dessiner en rouge
-                        if (!hasSelectable || node === self) {
-                            const x = canvasRect.left + (node.pos[0] + canvas.ds.offset[0]) * canvas.ds.scale;
-                            const y = canvasRect.top + (node.pos[1] + canvas.ds.offset[1]) * canvas.ds.scale;
-                            const w = node.size[0] * canvas.ds.scale;
-                            const h = node.size[1] * canvas.ds.scale;
-                            
-                            ctx.fillStyle = "rgba(100, 20, 20, 0.5)";
-                            ctx.fillRect(x, y, w, h);
-                        }
-                    });
-                };
-                
-                // Animation loop
-                const animate = () => {
-                    if (document.getElementById("widget-picker-overlay")) {
-                        drawRedOverlays();
-                        self.pickingAnimation = requestAnimationFrame(animate);
-                    }
-                };
-                animate();
-                
-                // Click handler
-                const handleClick = (e) => {
-                    console.log("Handler called, button:", e.button);
-                    
-                    if (e.button !== 0) return; // Seulement left-click
-                    
-                    e.preventDefault();
-                    e.stopPropagation();
-                    e.stopImmediatePropagation();
-                    
-                    const rect = canvas.canvas.getBoundingClientRect();
-                    const x = e.clientX - rect.left;
-                    const y = e.clientY - rect.top;
-                    const graphX = x / canvas.ds.scale - canvas.ds.offset[0];
-                    const graphY = y / canvas.ds.scale - canvas.ds.offset[1];
-                    
-                    console.log("Click at graph coords:", {graphX, graphY, scale: canvas.ds.scale});
-                    console.log("Self node ID:", self.id, "Title:", self.title || self.type);
-                    
-                    // Trouver le node
-                    const nodes = graph._nodes || [];
-                    let foundNode = null;
-                    
-                    for (let i = nodes.length - 1; i >= 0; i--) {
-                        const node = nodes[i];
-                        if (!node) continue;
-                        
-                        if (graphX >= node.pos[0] && graphX <= node.pos[0] + node.size[0] &&
-                            graphY >= node.pos[1] && graphY <= node.pos[1] + node.size[1]) {
-                            foundNode = node;
-                            console.log("Found node:", node.title || node.type, "ID:", node.id, "at", node.pos);
-                            break;
-                        }
-                    }
-                    
-                    if (foundNode && foundNode.id !== self.id) {
-                        console.log("Node is different from self, checking widgets...");
-                        const widgets = foundNode.widgets || [];
-                        console.log("Total widgets:", widgets.length);
-                        
-                        const selectable = widgets.filter(w => {
-                            const isSelectable = w.type !== "button" && 
-                                w.name && 
-                                !w.name.startsWith("▶") && 
-                                !w.name.startsWith("▼");
-                            if (isSelectable) {
-                                console.log("  - Selectable:", w.name, "type:", w.type);
-                            }
-                            return isSelectable;
-                        });
-                        
-                        console.log("Node has", selectable.length, "selectable widgets");
-                        
-                        if (selectable.length > 0) {
-                            cleanup();
-                            self.showWidgetSelector(foundNode, selectable, targetWidget);
-                            return;
-                        } else {
-                            console.log("Node has no selectable widgets, cancelling");
-                        }
-                    } else if (foundNode) {
-                        console.log("Found node is self (same ID), ignoring");
-                    } else {
-                        console.log("No node found at click position");
-                    }
-                    
-                    cleanup();
-                };
-                
-                // ESC handler
-                const handleEsc = (e) => {
-                    if (e.key === "Escape") {
-                        console.log("Picking cancelled");
-                        cleanup();
-                    }
-                };
-                
-                // Cleanup function
-                const cleanup = () => {
-                    // Restaurer le curseur
-                    document.body.style.cursor = originalCursor;
-                    
-                    // Annuler le timeout si pas encore déclenché
-                    if (clickHandlerTimeout) {
-                        clearTimeout(clickHandlerTimeout);
-                    }
-                    
-                    if (self.pickingAnimation) {
-                        cancelAnimationFrame(self.pickingAnimation);
-                        self.pickingAnimation = null;
-                    }
-                    
-                    const elements = [
-                        document.getElementById("widget-picker-overlay"),
-                        document.getElementById("widget-picker-canvas"),
-                        instruction
-                    ];
-                    
-                    elements.forEach(el => {
-                        if (el && el.parentNode) {
-                            el.parentNode.removeChild(el);
-                        }
-                    });
-                    
-                    canvas.canvas.removeEventListener("click", handleClick, true);
-                    document.removeEventListener("keydown", handleEsc);
-                };
-                
-                document.addEventListener("keydown", handleEsc);
-                
-                // Attendre un court instant avant d'activer le click handler
-                // pour éviter que le clic sur le bouton Pick ne soit capturé
-                let clickHandlerTimeout = setTimeout(() => {
-                    canvas.canvas.addEventListener("click", handleClick, true);
-                    console.log("Click handler activated");
-                }, 100);
-            };
+// Système de picking de widget - Version avec cercle et overlays rouges
+nodeType.prototype.startPicking = function(targetWidget) {
+    const self = this;
+    const canvas = app.canvas;
+    const graph = app.graph;
+    
+    console.log("🔗 Picking mode activated");
+    
+    // Sauvegarder le curseur original
+    const originalCursor = document.body.style.cursor;
+    document.body.style.cursor = "default";
+    
+    // Overlay transparent (nécessaire pour le z-index)
+    const overlay = document.createElement("div");
+    overlay.id = "widget-picker-overlay";
+    overlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: transparent;
+        z-index: 9997;
+        pointer-events: none;
+    `;
+    
+    // Message d'instruction
+    const instruction = document.createElement("div");
+    instruction.style.cssText = `
+        position: fixed;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background-color: #4a9eff;
+        color: white;
+        padding: 12px 24px;
+        border-radius: 40px;
+        font-size: 16px;
+        font-weight: bold;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        z-index: 9999;
+        pointer-events: none;
+        border: 2px solid white;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    `;
+    instruction.innerHTML = `
+        <span style="font-size: 20px;">🔗</span>
+        <span>Click a node to pick a widget</span>
+        <span style="background: rgba(255,255,255,0.3); padding: 2px 8px; border-radius: 20px; font-size: 12px;">ESC</span>
+    `;
+    
+    // Canvas pour dessiner les overlays rouges (à garder !)
+    const overlayCanvas = document.createElement("canvas");
+    overlayCanvas.id = "widget-picker-canvas";
+    overlayCanvas.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 9996;
+        pointer-events: none;
+    `;
+    overlayCanvas.width = window.innerWidth;
+    overlayCanvas.height = window.innerHeight;
+    
+    // Cercle qui suit la souris - SANS transition pour plus de fluidité
+    const crosshair = document.createElement("div");
+    crosshair.id = "picker-crosshair";
+    crosshair.style.cssText = `
+        position: fixed;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: rgba(74, 158, 255, 0.2);
+        border: 2px solid #4a9eff;
+        transform: translate(-50%, -50%);
+        pointer-events: none;
+        z-index: 9998;
+        box-shadow: 0 0 15px rgba(74, 158, 255, 0.3);
+        will-change: left, top; /* Optimisation performance */
+    `;
+    
+    // Animation simple pour le cercle (sans transition)
+    const style = document.createElement("style");
+    style.id = "picker-style";
+    style.textContent = `
+        @keyframes softPulse {
+            0% { transform: translate(-50%, -50%) scale(0.7); opacity: 0.8; }
+            50% { transform: translate(-50%, -50%) scale(1.1); opacity: 0.5; }
+            100% { transform: translate(-50%, -50%) scale(0.7); opacity: 0.8; }
+        }
+        #picker-crosshair {
+            animation: softPulse 1s infinite;
+        }
+    `;
+    document.head.appendChild(style);
+    
+    document.body.appendChild(overlay);
+    document.body.appendChild(overlayCanvas);
+    document.body.appendChild(instruction);
+    document.body.appendChild(crosshair);
+    
+    // Fonction pour dessiner les rectangles rouges
+    const drawRedOverlays = () => {
+        const ctx = overlayCanvas.getContext("2d");
+        ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+        
+        const canvasElement = canvas.canvas;
+        const canvasRect = canvasElement.getBoundingClientRect();
+        const nodes = graph._nodes || [];
+        
+        nodes.forEach(node => {
+            if (!node) return;
             
+            const widgets = node.widgets || [];
+            const hasSelectable = widgets.some(w => 
+                w.type !== "button" && 
+                w.name && 
+                !w.name.startsWith("▶") && 
+                !w.name.startsWith("▼")
+            );
+            
+            // Garder les overlays rouges sur les nodes non-sélectionnables
+            if (!hasSelectable || node === self) {
+                const x = canvasRect.left + (node.pos[0] + canvas.ds.offset[0]) * canvas.ds.scale;
+                const y = canvasRect.top + (node.pos[1] + canvas.ds.offset[1]) * canvas.ds.scale;
+                const w = node.size[0] * canvas.ds.scale;
+                const h = node.size[1] * canvas.ds.scale;
+                
+                ctx.fillStyle = "rgba(100, 20, 20, 0.5)";
+                ctx.fillRect(x, y, w, h);
+            }
+        });
+    };
+    
+    // Animation loop pour les overlays rouges
+    const animate = () => {
+        if (document.getElementById("widget-picker-overlay")) {
+            drawRedOverlays();
+            self.pickingAnimation = requestAnimationFrame(animate);
+        }
+    };
+    animate();
+    
+    // Faire suivre le cercle - utiliser requestAnimationFrame pour plus de fluidité
+    let mouseX = 0, mouseY = 0;
+    const handleMouseMove = (e) => {
+        mouseX = e.clientX;
+        mouseY = e.clientY;
+    };
+    
+    const updateCrosshair = () => {
+        if (crosshair && crosshair.parentNode) {
+            crosshair.style.left = mouseX + "px";
+            crosshair.style.top = mouseY + "px";
+            requestAnimationFrame(updateCrosshair);
+        }
+    };
+    
+    document.addEventListener("mousemove", handleMouseMove);
+    requestAnimationFrame(updateCrosshair);
+    
+    // Click handler
+    const handleClick = (e) => {
+        if (e.button !== 0) return;
+        
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        
+        const canvasElement = canvas.canvas;
+        const rect = canvasElement.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        const graphX = x / canvas.ds.scale - canvas.ds.offset[0];
+        const graphY = y / canvas.ds.scale - canvas.ds.offset[1];
+        
+        const nodes = graph._nodes || [];
+        let foundNode = null;
+        
+        for (let i = nodes.length - 1; i >= 0; i--) {
+            const node = nodes[i];
+            if (!node) continue;
+            
+            if (graphX >= node.pos[0] && graphX <= node.pos[0] + node.size[0] &&
+                graphY >= node.pos[1] && graphY <= node.pos[1] + node.size[1]) {
+                foundNode = node;
+                break;
+            }
+        }
+        
+        if (foundNode && foundNode.id !== self.id) {
+            const widgets = foundNode.widgets || [];
+            const selectable = widgets.filter(w => 
+                w.type !== "button" && 
+                w.name && 
+                !w.name.startsWith("▶") && 
+                !w.name.startsWith("▼")
+            );
+            
+            if (selectable.length > 0) {
+                cleanup();
+                self.showWidgetSelector(foundNode, selectable, targetWidget);
+                return;
+            }
+        }
+        
+        cleanup();
+    };
+    
+    const handleEsc = (e) => {
+        if (e.key === "Escape") {
+            cleanup();
+        }
+    };
+    
+    const cleanup = () => {
+        document.body.style.cursor = originalCursor;
+        document.removeEventListener("mousemove", handleMouseMove);
+        
+        if (clickHandlerTimeout) {
+            clearTimeout(clickHandlerTimeout);
+        }
+        
+        if (self.pickingAnimation) {
+            cancelAnimationFrame(self.pickingAnimation);
+            self.pickingAnimation = null;
+        }
+        
+        const elements = [
+            document.getElementById("widget-picker-overlay"),
+            document.getElementById("widget-picker-canvas"),
+            document.getElementById("picker-crosshair"),
+            instruction
+        ];
+        
+        elements.forEach(el => {
+            if (el && el.parentNode) {
+                el.parentNode.removeChild(el);
+            }
+        });
+        
+        const styleEl = document.getElementById("picker-style");
+        if (styleEl) styleEl.remove();
+        
+        canvas.canvas.removeEventListener("click", handleClick, true);
+        document.removeEventListener("keydown", handleEsc);
+    };
+    
+    document.addEventListener("keydown", handleEsc);
+    
+    let clickHandlerTimeout = setTimeout(() => {
+        canvas.canvas.addEventListener("click", handleClick, true);
+        console.log("Click handler activated");
+    }, 100);
+};            
             // Popup de sélection de widget
             nodeType.prototype.showWidgetSelector = function(sourceNode, widgets, targetWidget) {
+				const self = this;
                 const popup = document.createElement("div");
                 popup.style.cssText = `
                     position: fixed;
@@ -385,6 +420,51 @@ app.registerExtension({
 
             nodeType.prototype.buildUI = function() {
                 this.widgets = [];
+				
+				const collapseAllBtn = this.addWidget("button", "▲ Collapse all", null, () => {
+				// Liste de toutes les propriétés de collapse
+					const collapseProps = [
+						"data_collapsed",
+						"dateformat_collapsed", 
+						"model_collapsed",
+						"loras_collapsed",
+						"textreplace_collapsed",
+						"naming_collapsed",
+						"output_collapsed"
+					];
+					
+					// Tout mettre en true (collapsed)
+					collapseProps.forEach(prop => {
+						this.properties[prop] = true;
+					});
+					
+					// Reconstruire l'interface
+					this.buildUI();
+				});
+				collapseAllBtn.serialize = false;
+				
+				// Styliser le bouton
+				collapseAllBtn.computeSize = function(width) {
+					return [width, 24];
+				};
+				
+				collapseAllBtn.draw = function(ctx, node, widget_width, y, H) {
+					// Fond légèrement plus foncé
+					ctx.fillStyle = "rgba(51,51,51,0.25)";
+					ctx.fillRect(2+widget_width/4, y, widget_width/2 - 4, H - 2);
+					
+					// Bordure subtile
+					ctx.strokeStyle = "rgba(134, 172, 230,0.2)";
+					ctx.lineWidth = 0;
+					ctx.strokeRect(2+widget_width/4, y, widget_width/2 - 4, H - 2);
+					
+					// Texte
+					ctx.fillStyle = "#7090c0";
+					ctx.font = "bold 12px Arial";
+					ctx.textAlign = "center";
+					ctx.fillText("▲ Collapse All Sections", widget_width * 0.5, y + H * 0.65);
+					ctx.textAlign = "left";
+				};
 
                 const addHeader = (text, collapsedProp) => {
                     const isCollapsed = this.properties[collapsedProp];
@@ -417,9 +497,9 @@ app.registerExtension({
 
                     widget.draw = function(ctx, node, widget_width, y, H) {
                         if (bgColor === "#3a1a1a") {
-                            ctx.fillStyle = "rgba(255, 68, 68, 0.05)";
+                            ctx.fillStyle = "rgba(255, 68, 68, 0.08)";
                         } else if (bgColor === "#1a3a1a") {
-                            ctx.fillStyle = "rgba(68, 225, 68, 0.05)";
+                            ctx.fillStyle = "rgba(68, 225, 68, 0.06)";
                         } else {
                             ctx.fillStyle = bgColor;
                         }
@@ -598,7 +678,7 @@ app.registerExtension({
                         this.properties.extra3 = v;
                     }, { values: namingFields });
 
-                    this.addWidget("combo", "model", this.properties.model, (v) => {
+                    this.addWidget("combo", "extra4", this.properties.model, (v) => {
                         this.properties.model = v;
                     }, { values: namingFields });
 

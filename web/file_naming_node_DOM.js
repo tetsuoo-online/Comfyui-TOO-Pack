@@ -218,6 +218,105 @@ const CSS_STYLES = `
 .fn-toggle.off:hover {
     background: rgba(128, 128, 128, 0.35);
 }
+
+.fn-button.pick {
+    background: rgba(68, 138, 255, 0.2);
+    border-color: #4a9eff;
+    width: 100%;
+    margin-top: 4px;
+}
+
+.fn-button.pick:hover {
+    background: rgba(68, 138, 255, 0.35);
+}
+
+/* Popup styles */
+.widget-picker-popup {
+    position: fixed;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    background-color: #2a2a2a;
+    border: 2px solid #555;
+    border-radius: 8px;
+    padding: 20px;
+    z-index: 10000;
+    min-width: 300px;
+    max-width: 500px;
+    max-height: 600px;
+    overflow-y: auto;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+}
+
+.widget-picker-title {
+    color: #fff;
+    font-size: 16px;
+    font-weight: bold;
+    margin-bottom: 15px;
+    border-bottom: 1px solid #555;
+    padding-bottom: 10px;
+}
+
+.widget-picker-item {
+    padding: 10px;
+    margin: 5px 0;
+    background-color: #3a3a3a;
+    color: #fff;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+}
+
+.widget-picker-item:hover {
+    background-color: #4a4a4a;
+}
+
+.widget-picker-overlay {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0);
+    z-index: 9997;
+    pointer-events: none;
+}
+
+.widget-picker-modal-overlay {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+    z-index: 9999;
+}
+
+.widget-picker-instruction {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: rgba(74, 158, 255, 0.95);
+    color: #fff;
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: bold;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    z-index: 9999;
+    pointer-events: none;
+}
+
+.widget-picker-canvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 9998;
+    pointer-events: none;
+}
 `;
 
 function injectStyles() {
@@ -308,6 +407,7 @@ app.registerExtension({
 
             // Fonction helper pour créer les event listeners de drag-and-drop
             nodeType.prototype.makeDraggable = function(group, index, array, arrayName) {
+				const self = this;
                 group.draggable = true;
                 group.classList.add('draggable');
                 group.dataset.index = index;
@@ -360,13 +460,226 @@ app.registerExtension({
                     if (fromIndex === toIndex) return;
 
                     // Réorganiser le tableau
-                    const targetArray = arrayName === 'data_fields' ? this.data_fields : this.text_replace_pairs;
+                    const targetArray = arrayName === 'data_fields' ? self.data_fields : self.text_replace_pairs;
                     const [movedItem] = targetArray.splice(fromIndex, 1);
                     targetArray.splice(toIndex, 0, movedItem);
 
                     // Rebuild UI
-                    this.rebuildUI();
+                    self.rebuildUI();
                 });
+            };
+
+            // Système de picking de widget
+            nodeType.prototype.startPicking = function(inputElement) {
+                const self = this;
+                const canvas = app.canvas;
+                const graph = app.graph;
+                
+                console.log("🔗 Picking mode activated");
+                
+                // Changer le curseur du document
+                const originalCursor = document.body.style.cursor;
+                document.body.style.cursor = "crosshair";
+                
+                // Overlay semi-transparent
+                const overlay = document.createElement("div");
+                overlay.className = "widget-picker-overlay";
+                
+                // Message d'instruction
+                const instruction = document.createElement("div");
+                instruction.className = "widget-picker-instruction";
+                instruction.innerHTML = "🔗 Click on a node to pick a widget &nbsp;•&nbsp; ESC to cancel";
+                
+                // Canvas pour dessiner les overlays rouges
+                const overlayCanvas = document.createElement("canvas");
+                overlayCanvas.className = "widget-picker-canvas";
+                overlayCanvas.width = window.innerWidth;
+                overlayCanvas.height = window.innerHeight;
+                
+                document.body.appendChild(overlay);
+                document.body.appendChild(instruction);
+                document.body.appendChild(overlayCanvas);
+                
+                // Fonction pour dessiner les rectangles rouges
+                const drawRedOverlays = () => {
+                    const ctx = overlayCanvas.getContext("2d");
+                    ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+                    
+                    const canvasRect = canvas.canvas.getBoundingClientRect();
+                    const nodes = graph._nodes || [];
+                    
+                    nodes.forEach(node => {
+                        if (!node) return;
+                        
+                        // Vérifier si le node a des widgets sélectionnables
+                        const widgets = node.widgets || [];
+                        const hasSelectable = widgets.some(w => 
+                            w.type !== "button" && 
+                            w.name && 
+                            !w.name.startsWith("▶") && 
+                            !w.name.startsWith("▼")
+                        );
+                        
+                        // Si pas sélectionnable OU c'est le node lui-même, dessiner en rouge
+                        if (!hasSelectable || node === self) {
+                            const x = canvasRect.left + (node.pos[0] + canvas.ds.offset[0]) * canvas.ds.scale;
+                            const y = canvasRect.top + (node.pos[1] + canvas.ds.offset[1]) * canvas.ds.scale;
+                            const w = node.size[0] * canvas.ds.scale;
+                            const h = node.size[1] * canvas.ds.scale;
+                            
+                            ctx.fillStyle = "rgba(100, 20, 20, 0.5)";
+                            ctx.fillRect(x, y, w, h);
+                        }
+                    });
+                };
+                
+                // Animation loop
+                const animate = () => {
+                    if (document.body.contains(overlay)) {
+                        drawRedOverlays();
+                        self.pickingAnimation = requestAnimationFrame(animate);
+                    }
+                };
+                animate();
+                
+                // Click handler
+                const handleClick = (e) => {
+                    if (e.button !== 0) return; // Seulement left-click
+                    
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.stopImmediatePropagation();
+                    
+                    const rect = canvas.canvas.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const y = e.clientY - rect.top;
+                    const graphX = x / canvas.ds.scale - canvas.ds.offset[0];
+                    const graphY = y / canvas.ds.scale - canvas.ds.offset[1];
+                    
+                    // Trouver le node
+                    const nodes = graph._nodes || [];
+                    let foundNode = null;
+                    
+                    for (let i = nodes.length - 1; i >= 0; i--) {
+                        const node = nodes[i];
+                        if (!node) continue;
+                        
+                        if (graphX >= node.pos[0] && graphX <= node.pos[0] + node.size[0] &&
+                            graphY >= node.pos[1] && graphY <= node.pos[1] + node.size[1]) {
+                            foundNode = node;
+                            break;
+                        }
+                    }
+                    
+                    if (foundNode && foundNode.id !== self.id) {
+                        const widgets = foundNode.widgets || [];
+                        
+                        const selectable = widgets.filter(w => 
+                            w.type !== "button" && 
+                            w.name && 
+                            !w.name.startsWith("▶") && 
+                            !w.name.startsWith("▼")
+                        );
+                        
+                        if (selectable.length > 0) {
+                            cleanup();
+                            self.showWidgetSelector(foundNode, selectable, inputElement);
+                            return;
+                        }
+                    }
+                    
+                    cleanup();
+                };
+                
+                // ESC handler
+                const handleEsc = (e) => {
+                    if (e.key === "Escape") {
+                        cleanup();
+                    }
+                };
+                
+                // Cleanup function
+                const cleanup = () => {
+                    document.body.style.cursor = originalCursor;
+                    
+                    if (clickHandlerTimeout) {
+                        clearTimeout(clickHandlerTimeout);
+                    }
+                    
+                    if (self.pickingAnimation) {
+                        cancelAnimationFrame(self.pickingAnimation);
+                        self.pickingAnimation = null;
+                    }
+                    
+                    if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+                    if (instruction.parentNode) instruction.parentNode.removeChild(instruction);
+                    if (overlayCanvas.parentNode) overlayCanvas.parentNode.removeChild(overlayCanvas);
+                    
+                    canvas.canvas.removeEventListener("click", handleClick, true);
+                    document.removeEventListener("keydown", handleEsc);
+                };
+                
+                document.addEventListener("keydown", handleEsc);
+                
+                // Attendre un court instant avant d'activer le click handler
+                let clickHandlerTimeout = setTimeout(() => {
+                    canvas.canvas.addEventListener("click", handleClick, true);
+                }, 100);
+            };
+            
+            // Popup de sélection de widget
+            nodeType.prototype.showWidgetSelector = function(sourceNode, widgets, inputElement) {
+                const self = this;
+                
+                const popup = document.createElement("div");
+                popup.className = "widget-picker-popup";
+                
+                const title = document.createElement("div");
+                title.className = "widget-picker-title";
+                title.textContent = `Select widget from: ${sourceNode.title || sourceNode.type}`;
+                popup.appendChild(title);
+                
+                widgets.forEach(widget => {
+                    const item = document.createElement("div");
+                    item.className = "widget-picker-item";
+                    item.textContent = `${widget.name} (${widget.type})`;
+                    
+                    item.onclick = () => {
+                        const reference = `#${sourceNode.id}:${widget.name}`;
+                        inputElement.value = reference;
+                        
+                        // Déclencher l'événement input pour que les listeners réagissent
+                        const event = new Event('input', { bubbles: true });
+                        inputElement.dispatchEvent(event);
+                        
+                        self.rebuildUI();
+                        document.body.removeChild(popup);
+                        document.body.removeChild(bgOverlay);
+                    };
+                    
+                    popup.appendChild(item);
+                });
+                
+                const cancelBtn = document.createElement("button");
+                cancelBtn.className = "fn-button";
+                cancelBtn.textContent = "Cancel";
+                cancelBtn.style.marginTop = "15px";
+                cancelBtn.style.width = "100%";
+                cancelBtn.onclick = () => {
+                    document.body.removeChild(popup);
+                    document.body.removeChild(bgOverlay);
+                };
+                popup.appendChild(cancelBtn);
+                
+                const bgOverlay = document.createElement("div");
+                bgOverlay.className = "widget-picker-modal-overlay";
+                bgOverlay.onclick = () => {
+                    document.body.removeChild(popup);
+                    document.body.removeChild(bgOverlay);
+                };
+                
+                document.body.appendChild(bgOverlay);
+                document.body.appendChild(popup);
             };
 
             nodeType.prototype.buildDOMUI = function() {
@@ -451,9 +764,23 @@ app.registerExtension({
                         row2.appendChild(label2);
                         row2.appendChild(input2);
                         row2.appendChild(deleteBtn);
+                        
+                        // Ajouter le bouton Pick pour Value
+                        const rowPick = document.createElement('div');
+                        rowPick.className = 'fn-field-row';
+                        
+                        const pickBtn = document.createElement('button');
+                        pickBtn.className = 'fn-button pick';
+                        pickBtn.textContent = '🔗 Pick Widget';
+                        pickBtn.addEventListener('click', () => {
+                            this.startPicking(input2);
+                        });
+                        
+                        rowPick.appendChild(pickBtn);
 
                         group.appendChild(row1);
                         group.appendChild(row2);
+                        group.appendChild(rowPick);
 
                         // Rendre le groupe draggable
                         this.makeDraggable(group, index, this.data_fields, 'data_fields');
@@ -521,6 +848,20 @@ app.registerExtension({
                     row.appendChild(label);
                     row.appendChild(input);
                     content.appendChild(row);
+                    
+                    // Ajouter le bouton Pick
+                    const rowPick = document.createElement('div');
+                    rowPick.className = 'fn-field-row';
+                    
+                    const pickBtn = document.createElement('button');
+                    pickBtn.className = 'fn-button pick';
+                    pickBtn.textContent = '🔗 Pick Widget';
+                    pickBtn.addEventListener('click', () => {
+                        this.startPicking(input);
+                    });
+                    
+                    rowPick.appendChild(pickBtn);
+                    content.appendChild(rowPick);
 
                     return content;
                 });
@@ -558,6 +899,20 @@ app.registerExtension({
                         row.appendChild(input);
                         row.appendChild(deleteBtn);
                         content.appendChild(row);
+                        
+                        // Ajouter le bouton Pick pour ce Lora
+                        const rowPick = document.createElement('div');
+                        rowPick.className = 'fn-field-row';
+                        
+                        const pickBtn = document.createElement('button');
+                        pickBtn.className = 'fn-button pick';
+                        pickBtn.textContent = '🔗 Pick Widget';
+                        pickBtn.addEventListener('click', () => {
+                            this.startPicking(input);
+                        });
+                        
+                        rowPick.appendChild(pickBtn);
+                        content.appendChild(rowPick);
                     });
 
                     const addBtn = document.createElement('button');
