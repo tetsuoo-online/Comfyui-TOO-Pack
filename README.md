@@ -31,10 +31,12 @@ git clone https://github.com/tetsuoo-online/Comfyui-TOO-Pack
 
 | Node | Category | Description |
 |------|----------|-------------|
+| [Simple Image Loader](#simple-image-loader-) | `TOO-Pack/image` | Simple image loader with a dynamic preview, no need to start the workflow :) |
 | [Smart Image Loader](#smart-image-loader-) | `TOO-Pack/image` | Flexible image loader with multiple sources |
 | [Smart Image Saver](#smart-image-saver-) | `TOO-Pack/image` | Intelligent saver with flexible naming and metadata |
 | [Smart Image Saver (Advanced)](#smart-image-saver-advanced-) | `TOO-Pack/image` | Advanced saver with dynamic naming and A1111/Civitai metadata |
 | [TOO Crop Image](#too-crop-image) | `TOO-Pack/image` | Interactive cropping tool  |
+| [TOO lmage Metadata](#too-image-metadata) | `TOO-Pack/image` | Metadata editing  |
 | [Krita Bridge](#krita-bridge-) | `TOO-Pack/image` | Auto-load images from Krita |
 | [Extract Widget From Node](#extract-widget-from-node-) | `TOO-Pack/utils` | Extract widget values from workflow nodes |
 | [Collection Categorizer](#collection-categorizer-llm-) | `TOO-Pack/utils` | Categorize files with local LLM (Ollama) |
@@ -42,6 +44,45 @@ git clone https://github.com/tetsuoo-online/Comfyui-TOO-Pack
 ---
 
 ## 📚 Node Documentation
+
+### Simple Image Loader 🖼
+
+<details>
+<summary><b><span style="color:#60a5fa;">Click to expand full documentation</span></b></summary>
+
+An image loader that show instant preview with any path. You're no longer limited to ComfyUI/input folder.</br>
+The idea was inspired by the <b>Load Image (Path)</b> node from [comfyui-VideoHelperSuite](https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite), with a few more features.
+
+<img width="354" height="637" alt="Image" src="https://github.com/user-attachments/assets/70d198bc-3267-4349-9c4e-963a1d7000c8" />
+
+#### Features
+
+- 🖼️ **Image input via path** img_path will work with any path on your computer, it doesn't have to be in ComfyUI folders
+- 🖼️ **Image Preview** Instant preview, no need to start the workflow. Can be toggled on/off
+- 📊 **A1111/Civitai** metadata extraction
+- 🔄 **ComfyUI** workflow extraction
+- **Returns file path** of loaded image
+
+#### Parameters
+
+**Required Parameters**
+
+| Parameter | Type | Description | Default |
+|-----------|------|-------------|---------|
+| **img_path** | STRING | Direct path to an image file | - |
+
+**Outputs**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| **IMAGE** | IMAGE | The loaded image (from image input or widgets) |
+| **FILE_PATH** | STRING | Path of loaded file |
+| **metadata** | METADATA | A1111/Civitai metadata extracted from file |
+| **workflow** | WORKFLOW | ComfyUI workflow extracted from file |
+
+</details>
+
+---
 
 ### Smart Image Loader 🖼
 
@@ -658,8 +699,27 @@ Interactive tool for cropping your image before output.
 <img width="593" height="900" alt="Image" src="https://github.com/user-attachments/assets/e21571be-fd90-4f8b-bb95-9287f90e06fd" />
 
 If you use the image input then the cropping will apply to it. However the interactive preview works only with img_path input so you will need to use that.
+You can also use only img_path lilke you would with a Simple Image Loader
 
 </details>
+
+---
+
+### TOO Image Metadata
+
+<details>
+<summary><b><span style="color:#60a5fa;">Click to expand full documentation</span></b></summary>
+
+Editing tool for A1111/Civitai metadata.
+
+<img width="472" height="678" alt="Image" src="https://github.com/user-attachments/assets/3891ca35-3e5a-4d46-b797-16faef5111dd" />
+
+Very straight forward, you will need <b>TOO Simple Image Loader</b> or <b>TOO Smart Image Loader</b> to input the metadata to modify. Any empty field will be ignored, the node will not erase any original metadata unless you specify something.</br>
+For the model field you might want to follow A1111/Civitai syntax [``Model hash: <hash>, Model: modelName``] -> Only 1 model can be input, as far as I know... Maybe something to investigate later x)</br>
+As for the loras, the syntax is [``Lora hashes: "<lora1>:<hash>,<lora2>:<hash>,<lora....>:<hash>"``] -> As many loras as necessary</br>
+
+</details>
+
 ---
 
 ### Krita Bridge 🎨
