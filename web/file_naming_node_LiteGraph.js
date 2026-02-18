@@ -546,6 +546,7 @@ nodeType.prototype.startPicking = function(targetWidget) {
 
                         this.addWidget("text", `name`, field.name, (v) => {
                             this.data_fields[i].name = v;
+							this.setDirtyCanvas(true, true);
                         });
 
                         addTextWithPicker(`value (text or #id:widget)`, field.value || "", (v) => {
@@ -555,14 +556,33 @@ nodeType.prototype.startPicking = function(targetWidget) {
                         const delBtn = this.addWidget("button", "❌", null, () => {
                             this.data_fields.splice(i, 1);
                             this.buildUI();
+							this.setDirtyCanvas(true, true);  // ← forcer affichage
                         });
                         delBtn.serialize = false;
                         styleButton(delBtn, "#3a1a1a");
                     }
 
-                    const addBtn = this.addWidget("button", "➕ Add Field", null, () => {
-                        this.data_fields.push({ name: "field", value: "" });
-                        this.buildUI();
+					const addBtn = this.addWidget("button", "Add Field", null, () => {
+						// Trouver le premier numéro libre
+						let index = 1;
+						const existingNames = this.data_fields.map(f => f.name);
+						while (existingNames.includes(`field${index}`)) {
+							index++;
+						}
+						const newName = `field${index}`;
+
+						this.data_fields.push({ name: newName, value: "" });
+						this.buildUI();
+						this.setDirtyCanvas(true, true);
+						setTimeout(() => {
+							const newFieldWidgets = this.widgets.filter(w =>
+								w.name === "name" && w.value === newName
+							);
+							if (newFieldWidgets[0]) {
+								newFieldWidgets[0].element?.focus();
+								newFieldWidgets[0].element?.select();
+							}
+						}, 50);
                     });
                     addBtn.serialize = false;
                     styleButton(addBtn, "#1a3a1a");
@@ -678,8 +698,8 @@ nodeType.prototype.startPicking = function(targetWidget) {
                         this.properties.extra3 = v;
                     }, { values: namingFields });
 
-                    this.addWidget("combo", "extra4", this.properties.model, (v) => {
-                        this.properties.model = v;
+                    this.addWidget("combo", "extra4", this.properties.extra4, (v) => {
+                        this.properties.extra4 = v;
                     }, { values: namingFields });
 
                     this.addWidget("combo", "suffix", this.properties.suffix, (v) => {

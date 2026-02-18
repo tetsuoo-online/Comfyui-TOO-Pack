@@ -565,7 +565,7 @@ class FileNaming:
         separator = config.get("separator", "_")
 
         output_folder = ""
-        for field in ["output_folder", "prefix", "extra1", "extra2", "extra3", "model", "suffix"]:
+        for field in ["output_folder", "prefix", "extra1", "extra2", "extra3", "extra4", "suffix"]:
             value = config.get(field, "")
             if not value:
                 continue
