@@ -34,8 +34,9 @@ git clone https://github.com/tetsuoo-online/Comfyui-TOO-Pack
 | [Smart Image Loader](#smart-image-loader-) | `TOO-Pack/image` | Flexible image loader with multiple sources |
 | [Smart Image Saver](#smart-image-saver-) | `TOO-Pack/image` | Intelligent saver with flexible naming and metadata |
 | [Smart Image Saver (Advanced)](#smart-image-saver-advanced-) | `TOO-Pack/image` | Advanced saver with dynamic naming and A1111/Civitai metadata |
-| [Extract Widget From Node](#extract-widget-from-node-) | `TOO-Pack/utils` | Extract widget values from workflow nodes |
+| [TOO Crop Image](#too-crop-image) | `TOO-Pack/image` | Interactive cropping tool  |
 | [Krita Bridge](#krita-bridge-) | `TOO-Pack/image` | Auto-load images from Krita |
+| [Extract Widget From Node](#extract-widget-from-node-) | `TOO-Pack/utils` | Extract widget values from workflow nodes |
 | [Collection Categorizer](#collection-categorizer-llm-) | `TOO-Pack/utils` | Categorize files with local LLM (Ollama) |
 
 ---
@@ -645,6 +646,20 @@ widget_names = "control_net_name, strength"
 
 </details>
 
+---
+
+### TOO Crop Image
+
+<details>
+<summary><b><span style="color:#60a5fa;">Click to expand full documentation</span></b></summary>
+
+Interactive tool for cropping your image before output.
+
+<img width="593" height="900" alt="Image" src="https://github.com/user-attachments/assets/e21571be-fd90-4f8b-bb95-9287f90e06fd" />
+
+If you use the image input then the cropping will apply to it. However the interactive preview works only with img_path input so you will need to use that.
+
+</details>
 ---
 
 ### Krita Bridge 🎨
