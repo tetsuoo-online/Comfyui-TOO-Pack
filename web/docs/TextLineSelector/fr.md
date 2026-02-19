@@ -1,4 +1,4 @@
-# View Combo 📋
+# TExt Line Selector 📋
 
 Un nœud ComfyUI pour diviser un texte multiligne en lignes individuelles avec pagination avancée et capacités de sélection.
 

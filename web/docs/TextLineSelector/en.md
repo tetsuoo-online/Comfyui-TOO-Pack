@@ -1,4 +1,4 @@
-# View Combo 📋
+# Text Line Selector 📋
 
 A ComfyUI node for splitting multiline text <span style="background-color:#1e4d3e;color:#34d399;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:0.9em;">INT</span>o individual lines with advanced pagination and selection capabilities.
 

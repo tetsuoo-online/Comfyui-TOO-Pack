@@ -1,4 +1,4 @@
-class ViewCombo:
+class TextLineSelector:
     """
     A node that splits multiline text into individual lines with pagination support.
     Useful for viewing and processing text data in workflows.
@@ -24,7 +24,7 @@ class ViewCombo:
         }
 
     RETURN_TYPES = ("STRING", "STRING", "INT", "INT", "FLOAT", "INT")
-    RETURN_NAMES = ("STRING", "COMBO", "input_count", "output_count", "FLOAT", "INT")
+    RETURN_NAMES = ("STRING", "indexed", "input_count", "output_count", "FLOAT", "INT")
     OUTPUT_IS_LIST = (True, True, False, False, True, True)
     FUNCTION = "generate_strings"
     CATEGORY = "🔵TOO-Pack/utils"
@@ -44,7 +44,7 @@ class ViewCombo:
         Returns:
             Tuple containing:
             - List of raw text lines (STRING)
-            - List of numbered text lines (COMBO)
+            - List of numbered text lines (indexed)
             - Total number of non-empty lines in input (input_count)
             - Number of lines returned in current page (output_count)
             - List of float conversions (FLOAT) - defaults to 1.0 if not a number
@@ -170,9 +170,9 @@ class ViewCombo:
 
 
 NODE_CLASS_MAPPINGS = {
-    "ViewCombo": ViewCombo
+    "TextLineSelector": TextLineSelector
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "ViewCombo": "View Combo 📋"
+    "TextLineSelector": "Text Line Selector 📋"
 }
