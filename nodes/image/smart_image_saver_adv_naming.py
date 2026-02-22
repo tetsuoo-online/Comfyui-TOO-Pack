@@ -31,6 +31,7 @@ class FileNaming:
             "hidden": {
                 "prompt": "PROMPT",
                 "extra_pnginfo": "EXTRA_PNGINFO",
+                "unique_id": "UNIQUE_ID",
             }
         }
 
@@ -62,78 +63,42 @@ class FileNaming:
         return text
 
     def _safe_path(self, path):
-        """
-        Nettoie un chemin de fichier en retirant les caractères invalides.
-        """
         if not path:
             return path
-        
-        # Séparer le chemin en répertoire et nom de fichier
         directory = os.path.dirname(path)
         filename = os.path.basename(path)
-        
-        # Caractères invalides dans les noms de fichiers (Windows/Linux/Mac)
         invalid = '<>:"|?*\n\r\t'
-        # Pour le nom de fichier, nettoyer tous les caractères invalides
         clean_filename = "".join(c for c in filename if c not in invalid).strip()
-        
-        # Pour le répertoire, on garde les séparateurs de chemin
-        # On nettoie juste les \n, \r, \t
         clean_directory = directory.replace('\n', '').replace('\r', '').replace('\t', '').strip()
-        
-        # Reconstruire le chemin
         if clean_directory:
             return os.path.join(clean_directory, clean_filename)
         return clean_filename
     
     def _calculate_file_hash(self, filepath, hash_length=12):
-        """
-        Calculate SHA256 hash of a file and return first N characters.
-        Used for model_hash and lora_hashes in A1111 format.
-        """
         try:
-            # Try to find the actual file path
-            # ComfyUI stores models in various directories
             possible_paths = []
-            
-            # If it's already a full path and exists
             if os.path.isfile(filepath):
                 possible_paths.append(filepath)
             else:
-                # Try to find in ComfyUI directories
-                filename = os.path.basename(filepath)
-                
-                # Check in checkpoints folder
                 checkpoints_dir = folder_paths.get_folder_paths("checkpoints")
                 for cp_dir in checkpoints_dir:
                     full_path = os.path.join(cp_dir, filepath)
                     if os.path.isfile(full_path):
                         possible_paths.append(full_path)
-                
-                # Check in loras folder
                 loras_dir = folder_paths.get_folder_paths("loras")
                 for lora_dir in loras_dir:
                     full_path = os.path.join(lora_dir, filepath)
                     if os.path.isfile(full_path):
                         possible_paths.append(full_path)
-            
-            # Use the first valid path found
             if not possible_paths:
                 return ""
-            
             actual_path = possible_paths[0]
-            
-            # Calculate SHA256 hash
             sha256_hash = hashlib.sha256()
             with open(actual_path, "rb") as f:
-                # Read in chunks to handle large files
                 for byte_block in iter(lambda: f.read(4096), b""):
                     sha256_hash.update(byte_block)
-            
-            # Return first N characters of hex digest
             return sha256_hash.hexdigest()[:hash_length]
         except Exception as e:
-            # If hash calculation fails, return empty string
             print(f"Warning: Could not calculate hash for {filepath}: {e}")
             return ""
 
@@ -143,61 +108,43 @@ class FileNaming:
         Returns first 12 characters of the hash.
         """
         try:
-            # Try to find the actual file path (same logic as _calculate_file_hash)
             possible_paths = []
-
             if os.path.isfile(filepath):
                 possible_paths.append(filepath)
             else:
-                filename = os.path.basename(filepath)
-
-                # Check in checkpoints folder
                 checkpoints_dir = folder_paths.get_folder_paths("checkpoints")
                 for cp_dir in checkpoints_dir:
                     full_path = os.path.join(cp_dir, filepath)
                     if os.path.isfile(full_path):
                         possible_paths.append(full_path)
-
-                # Check in loras folder
                 loras_dir = folder_paths.get_folder_paths("loras")
                 for lora_dir in loras_dir:
                     full_path = os.path.join(lora_dir, filepath)
                     if os.path.isfile(full_path):
                         possible_paths.append(full_path)
-
             if not possible_paths:
                 return ""
-
             actual_path = possible_paths[0]
-
-            # Calculate SHA256 hash excluding safetensors metadata
             hash_sha256 = hashlib.sha256()
             blksize = 1024 * 1024
-
             with open(actual_path, "rb") as f:
                 header = f.read(8)
                 n = int.from_bytes(header, "little")
                 offset = n + 8
                 f.seek(offset)
-
                 for chunk in iter(lambda: f.read(blksize), b""):
                     hash_sha256.update(chunk)
-
             return hash_sha256.hexdigest()[:12]
-
         except Exception as e:
             print(f"Warning: Could not calculate lora hash for {filepath}: {e}")
             return ""
 
     def _build_a111_params(self, metadata, width, height):
         """Build A1111/Civitai format metadata string"""
-        # Get prompts and clean newlines (replace \n with space)
         positive = metadata.get("positive", "").strip()
-        positive = " ".join(positive.split())  # Replace all whitespace (including \n) with single space
-        
+        positive = " ".join(positive.split())
         negative = metadata.get("negative", "").strip()
-        negative = " ".join(negative.split())  # Replace all whitespace (including \n) with single space
-        
+        negative = " ".join(negative.split())
         seed = metadata.get("seed")
         steps = metadata.get("steps")
         cfg = metadata.get("cfg")
@@ -271,13 +218,8 @@ class FileNaming:
         if ":" not in extraction_pattern:
             return ""
 
-        # Check if starts with # (node ID extraction)
         if extraction_pattern.startswith("#"):
-            # Remove the #
             pattern_without_hash = extraction_pattern[1:]
-
-            # Find the last : which separates node_id from widget_name
-            # Example: "270:268:ckpt_name" -> node_id="270:268", widget="ckpt_name"
             last_colon_idx = pattern_without_hash.rfind(":")
             if last_colon_idx == -1:
                 return ""
@@ -285,21 +227,16 @@ class FileNaming:
             node_id = pattern_without_hash[:last_colon_idx]
             widget_name = pattern_without_hash[last_colon_idx + 1:]
 
-            # Look for this node_id in prompt
             if node_id in prompt:
                 node_data = prompt[node_id]
                 inputs = node_data.get("inputs", {})
                 value = inputs.get(widget_name, "")
-                
-                # Handle multiline strings - split by newlines and return list
                 if isinstance(value, str) and '\n' in value:
                     lines = [line.strip() for line in value.split('\n') if line.strip()]
                     return lines if lines else ""
-                
                 return str(value) if value else ""
             return ""
 
-        # Class name search: ClassName:widget_name
         else:
             parts = extraction_pattern.split(":", 1)
             if len(parts) != 2:
@@ -315,17 +252,13 @@ class FileNaming:
                 if class_search in class_type.lower():
                     inputs = node_data.get("inputs", {})
                     value = inputs.get(widget_name, "")
-                    
-                    # Handle multiline strings - split by newlines and return list
                     if isinstance(value, str) and '\n' in value:
                         lines = [line.strip() for line in value.split('\n') if line.strip()]
                         return lines if lines else ""
-                    
                     return str(value) if value else ""
             return ""
 
     def resolve_template_value(self, value, prompt, meta_dict, date_vars, any_values):
-        """Resolve template values with {...} syntax. Supports: {#id:widget}, {%date1}, {field}, {[any1]}, text"""
         if not value or "{" not in value:
             return self._resolve_simple(value, prompt, meta_dict, date_vars, any_values)
         
@@ -337,17 +270,13 @@ class FileNaming:
     def _resolve_simple(self, value, prompt, meta_dict, date_vars, any_values):
         if not value:
             return ""
-        
         v = value.strip()
         result = self._resolve_token(v, prompt, meta_dict, date_vars, any_values)
         return result if result is not None else value
 
     def _resolve_token(self, token, prompt, meta_dict, date_vars, any_values):
-        """Resolve a single token to its value or None if not found"""
-        # Check all sources in priority order
         if token in any_values and any_values[token]:
             result = self._convert_to_str(any_values[token])
-            # Clean paths if present (extract basename, remove extension)
             if result and ('\\' in result or '/' in result or result.endswith(('.safetensors', '.ckpt', '.pt', '.pth', '.bin'))):
                 result = os.path.splitext(os.path.basename(result))[0]
             return result if result else None
@@ -357,7 +286,6 @@ class FileNaming:
             extracted = self._extract_from_prompt(token, prompt)
             if extracted:
                 result = self._convert_to_str(extracted)
-                # Auto-clean paths from model/lora widgets
                 if result and ('\\' in result or '/' in result or result.endswith(('.safetensors', '.ckpt', '.pt', '.pth', '.bin'))):
                     result = os.path.splitext(os.path.basename(result))[0]
                 return result if result else None
@@ -366,7 +294,6 @@ class FileNaming:
         return None
     
     def _resolve_token_raw(self, token, prompt, meta_dict, date_vars, any_values):
-        """Resolve token and return raw value (list or string) without conversion"""
         if token in any_values and any_values[token]:
             return any_values[token]
         if token in date_vars and date_vars[token]:
@@ -378,73 +305,55 @@ class FileNaming:
         return None
 
     def _convert_to_str(self, val):
-        """Convert value to string, handling lists from multiline widgets"""
         if isinstance(val, list):
-            # Join with space and clean whitespace for A1111/Civitai compatibility
             return " ".join(" ".join(str(v).split()) for v in val)
         result = str(val) if val else ""
-        # Clean all whitespace (including \n) to single space
         return " ".join(result.split())
     
     def resolve_for_metadata(self, value, prompt, meta_dict, date_vars, any_values):
-        """Resolve for metadata: extract ONLY content inside {...}, or resolve simple syntax"""
         if not value:
             return ""
-        
         import re
-        # If {...} syntax, extract ONLY the first {...} content
         match = re.search(r'\{([^}]+)\}', value)
         if match:
             return self._resolve_token(match.group(1).strip(), prompt, meta_dict, date_vars, any_values) or ""
-        
-        # No {...}, resolve normally (retrocompat)
         return self._resolve_simple(value, prompt, meta_dict, date_vars, any_values)
     
     def resolve_for_metadata_raw(self, value, prompt, meta_dict, date_vars, any_values):
-        """Resolve for metadata but return raw value (list or string) without conversion"""
         if not value:
             return None
-        
         import re
-        # If {...} syntax, extract ONLY the first {...} content
         match = re.search(r'\{([^}]+)\}', value)
         if match:
             return self._resolve_token_raw(match.group(1).strip(), prompt, meta_dict, date_vars, any_values)
-        
-        # No {...}, resolve normally (retrocompat)
         v = value.strip()
         return self._resolve_token_raw(v, prompt, meta_dict, date_vars, any_values)
 
-    def save_images(self, images, metadata=None, workflow=None, any1=None, any2=None, any3=None, prompt=None, extra_pnginfo=None):
-        config = self._get_config(extra_pnginfo)
+    def save_images(self, images, metadata=None, workflow=None, any1=None, any2=None, any3=None, prompt=None, extra_pnginfo=None, unique_id=None):
+        config = self._get_config(extra_pnginfo, unique_id)
 
-        # Convert any inputs to strings if provided
         any1_value = str(any1).strip() if any1 is not None else ""
         any2_value = str(any2).strip() if any2 is not None else ""
         any3_value = str(any3).strip() if any3 is not None else ""
         
-        # Map for easy lookup
         any_values = {
             "[any1]": any1_value,
             "[any2]": any2_value,
             "[any3]": any3_value
         }
 
-        # Pre-parse date variables
         date_vars = {
             "%date1": self._parse_date_tokens(config.get("date1", "")),
             "%date2": self._parse_date_tokens(config.get("date2", "")),
             "%date3": self._parse_date_tokens(config.get("date3", ""))
         }
 
-        # Build metadata dict from data_fields
         meta_dict = {}
-        naming_dict = {}  # Separate dict for naming with full templates resolved
+        naming_dict = {}
         if metadata and isinstance(metadata, dict):
             meta_dict = metadata.copy()
             naming_dict = metadata.copy()
 
-        # Extract data_fields values with template support
         data_fields = config.get("data_fields", [])
         for field in data_fields:
             name = field.get("name", "")
@@ -453,53 +362,43 @@ class FileNaming:
             if not name:
                 continue
 
-            # For metadata: extract only {...} content (clean)
             resolved_meta = self.resolve_for_metadata(value, prompt, meta_dict, date_vars, any_values)
             if resolved_meta:
                 meta_dict[name] = resolved_meta
             
-            # For naming: resolve full template with prefix/suffix
             resolved_naming = self.resolve_template_value(value, prompt, meta_dict, date_vars, any_values)
             if resolved_naming:
                 naming_dict[name] = resolved_naming
 
-        # Extract model if configured
         model_extract = config.get("model_extract", "")
         if model_extract:
-            # For meta_dict: extract clean path
             model_value = self.resolve_for_metadata_raw(model_extract, prompt, meta_dict, date_vars, any_values)
             
             if model_value:
-                # Handle list case
                 if isinstance(model_value, list):
                     model_value = model_value[0] if model_value else None
                 
                 if model_value:
                     model_name = os.path.splitext(os.path.basename(str(model_value)))[0]
                     meta_dict["model"] = model_name
-                    # CORRECTION: Utiliser resolve_template_value pour préserver préfixes/suffixes
                     naming_dict["model"] = self.resolve_template_value(model_extract, prompt, meta_dict, date_vars, any_values)
                     if "model_name" not in meta_dict:
                         meta_dict["model_name"] = model_name
                         naming_dict["model_name"] = model_name
                     
-                    # Calculate model hash
                     if "model_hash" not in meta_dict:
                         model_hash = self._calculate_file_hash(str(model_value), 10)
                         if model_hash:
                             meta_dict["model_hash"] = model_hash
                             naming_dict["model_hash"] = model_hash
 
-        # Extract loras if configured
         loras_extracts = config.get("loras_extracts", [])
         lora_names = []
         lora_hashes_dict = {}
         for lora_extract in loras_extracts:
             if lora_extract:
-                # For meta_dict: extract clean paths
                 lora_value = self.resolve_for_metadata_raw(lora_extract, prompt, meta_dict, date_vars, any_values)
                 
-                # If string, split by newlines to handle multiple loras
                 if isinstance(lora_value, str):
                     lora_value = [line.strip() for line in lora_value.split('\n') if line.strip()]
                 
@@ -509,26 +408,21 @@ class FileNaming:
                     if lora_val:
                         lora_name = os.path.splitext(os.path.basename(str(lora_val)))[0]
                         lora_names.append(lora_name)
-                        
-                        # Calculate lora hash
                         lora_hash = self._calculate_lora_hash(str(lora_val))
                         if lora_hash:
                             lora_hashes_dict[lora_name] = lora_hash
 
         if lora_names:
             meta_dict["loras"] = ", ".join(lora_names)
-            # CORRECTION: Pour les loras, garder la valeur résolue avec préfixes/suffixes
             if loras_extracts and loras_extracts[0]:
                 naming_dict["loras"] = self.resolve_template_value(loras_extracts[0], prompt, meta_dict, date_vars, any_values)
             else:
                 naming_dict["loras"] = ", ".join(lora_names)
         
-        # Add lora_hashes to metadata if we calculated any
         if lora_hashes_dict and "lora_hashes" not in meta_dict:
             meta_dict["lora_hashes"] = lora_hashes_dict
             naming_dict["lora_hashes"] = lora_hashes_dict
 
-        # Apply text replacements by target
         replacements = config.get("text_replace_pairs", [])
         for pair in replacements:
             target = pair.get("target", "")
@@ -538,11 +432,9 @@ class FileNaming:
             if not input_str:
                 continue
 
-            # If target is [any1], [any2], or [any3], treat as no target (replace in all fields)
             if target in any_values:
                 target = ""
             
-            # Apply to meta_dict (for metadata)
             if target and target in meta_dict:
                 value = str(meta_dict[target])
                 meta_dict[target] = value.replace(input_str, output_str)
@@ -551,7 +443,6 @@ class FileNaming:
                     value = str(meta_dict[key])
                     meta_dict[key] = value.replace(input_str, output_str)
             
-            # Apply to naming_dict (for naming)
             if target and target in naming_dict:
                 value = str(naming_dict[target])
                 naming_dict[target] = value.replace(input_str, output_str)
@@ -560,7 +451,6 @@ class FileNaming:
                     value = str(naming_dict[key])
                     naming_dict[key] = value.replace(input_str, output_str)
 
-        # Build filename
         filename_parts = []
         separator = config.get("separator", "_")
 
@@ -570,7 +460,6 @@ class FileNaming:
             if not value:
                 continue
 
-            # Use naming_dict for lookups (contains full templates with prefix/suffix)
             resolved = self.resolve_template_value(value, prompt, naming_dict, date_vars, any_values)
             if not resolved:
                 continue
@@ -580,7 +469,6 @@ class FileNaming:
             else:
                 filename_parts.append(resolved)
 
-        # Setup output dir
         output_dir = self.output_dir
         if output_folder:
             output_folder = self._safe_path(output_folder)
@@ -590,13 +478,11 @@ class FileNaming:
         filename_base = separator.join(filename_parts) if filename_parts else "output"
         filename_base = self._safe_path(filename_base)
 
-        # Get settings
         output_format = config.get("output_format", "webp")
         quality = config.get("quality", 95)
         embed_workflow = config.get("embed_workflow", True)
         save_metadata = config.get("save_metadata", True)
 
-        # Save images
         saved_paths = []
         for i, image in enumerate(images):
             if len(images) > 1:
@@ -612,17 +498,14 @@ class FileNaming:
                 filepath = os.path.join(output_dir, filename)
                 counter += 1
 
-            # Convert to PIL
             i_np = 255. * image.cpu().numpy()
             img = Image.fromarray(np.clip(i_np, 0, 255).astype(np.uint8))
 
-            # Get A1111 params
             a111_params = None
             if save_metadata and meta_dict:
                 width, height = self._get_image_dimensions(image)
                 a111_params = self._build_a111_params(meta_dict, width, height)
 
-            # Save
             if output_format == "png":
                 self._save_png(img, filepath, a111_params, workflow, prompt, extra_pnginfo, embed_workflow)
             else:
@@ -632,7 +515,7 @@ class FileNaming:
 
         return (images, saved_paths[0] if saved_paths else "")
 
-    def _get_config(self, extra_pnginfo):
+    def _get_config(self, extra_pnginfo, unique_id=None):
         config = {
             "separator": "_",
             "output_format": "webp",
@@ -652,12 +535,20 @@ class FileNaming:
             try:
                 wf = json.loads(extra_pnginfo["workflow"]) if isinstance(extra_pnginfo["workflow"], str) else extra_pnginfo["workflow"]
                 nodes = wf.get("nodes", [])
-                for node in nodes:
-                    if node.get("type") in ["FileNaming", "FileNaming (LiteGraph)", "FileNaming (DOM)"]:
-                        config.update(node.get("properties", {}))
-                        config["text_replace_pairs"] = node.get("text_replace_pairs", [])
-                        config["data_fields"] = node.get("data_fields", [])
-                        break
+                target_node = None
+
+                # Chercher d'abord par unique_id
+                if unique_id is not None:
+                    uid = str(unique_id)
+                    for node in nodes:
+                        if str(node.get("id", "")) == uid:
+                            target_node = node
+                            break
+
+                if target_node:
+                    config.update(target_node.get("properties", {}))
+                    config["text_replace_pairs"] = target_node.get("text_replace_pairs", [])
+                    config["data_fields"] = target_node.get("data_fields", [])
             except:
                 pass
 
@@ -700,13 +591,10 @@ class FileNaming:
         if args.disable_metadata:
             return
 
-        # Construire le dictionnaire EXIF avec la technique multi-tag
         pnginfo_json = {}
         prompt_json = {}
 
-        # Workflow ComfyUI distribué sur plusieurs tags EXIF si demandé
         if embed_workflow:
-            # Si workflow est fourni en entrée, l'utiliser en priorité
             if workflow and isinstance(workflow, dict):
                 wf_extra_pnginfo = workflow.get("extra_pnginfo")
                 wf_prompt = workflow.get("prompt")
@@ -722,7 +610,6 @@ class FileNaming:
                         piexif.ImageIFD.Model: f"prompt:{json.dumps(wf_prompt, separators=(',', ':'))}"
                     }
             else:
-                # Sinon, utiliser le workflow courant
                 if extra_pnginfo is not None:
                     pnginfo_json = {
                         piexif.ImageIFD.Make - i: f"{k}:{json.dumps(v, separators=(',', ':'))}"
@@ -734,14 +621,11 @@ class FileNaming:
                         piexif.ImageIFD.Model: f"prompt:{json.dumps(prompt, separators=(',', ':'))}"
                     }
 
-        # Construire le dictionnaire EXIF complet
         exif_dict = {}
 
-        # Section "0th" pour workflow (multi-tag)
         if pnginfo_json or prompt_json:
             exif_dict["0th"] = pnginfo_json | prompt_json
 
-        # Section "Exif" pour les paramètres A1111
         if a111_params:
             exif_dict["Exif"] = {
                 piexif.ExifIFD.UserComment: piexif.helper.UserComment.dump(
@@ -750,17 +634,14 @@ class FileNaming:
                 )
             }
 
-        # Générer et insérer les données EXIF
         if exif_dict:
             try:
                 exif_bytes = piexif.dump(exif_dict)
 
-                # Vérification de taille pour JPEG
                 if output_format in ["jpg", "jpeg"]:
                     MAX_EXIF_SIZE = 65535
                     if len(exif_bytes) > MAX_EXIF_SIZE:
                         print(f"⚠️ Métadonnées trop volumineuses ({len(exif_bytes)} bytes) pour JPEG (max {MAX_EXIF_SIZE})")
-                        # Essayer sans le workflow
                         exif_dict_minimal = {}
                         if a111_params:
                             exif_dict_minimal["Exif"] = {
@@ -781,6 +662,7 @@ class FileNaming:
                 piexif.insert(exif_bytes, filepath)
             except Exception as e:
                 print(f"Could not save EXIF metadata: {e}")
+
 
 NODE_CLASS_MAPPINGS = {
     "FileNaming (LiteGraph)": FileNaming,
