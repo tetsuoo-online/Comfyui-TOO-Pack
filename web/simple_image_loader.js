@@ -45,6 +45,7 @@ app.registerExtension({
                     if (this.aspectRatio && !this.parentEl.hidden) {
                         let height = (previewNode.size[0] - 20) / this.aspectRatio + 10;
                         if (!(height > 0)) height = 0;
+                        if (!this.resolutionEl.hidden) height += 16;
                         return [width, height];
                     }
                     return [width, -4];
@@ -60,8 +61,16 @@ app.registerExtension({
                 previewWidget.imgEl.style.width = "100%";
                 previewWidget.imgEl.style.objectFit = "contain";
 
+                previewWidget.resolutionEl = document.createElement("div");
+                previewWidget.resolutionEl.style.cssText = "width:100%;text-align:center;font-size:11px;color:#aaa;padding:0;font-family:monospace;line-height:16px;";
+                previewWidget.resolutionEl.hidden = true;
+
                 previewWidget.imgEl.onload = () => {
-                    previewWidget.aspectRatio = previewWidget.imgEl.naturalWidth / previewWidget.imgEl.naturalHeight;
+                    const w = previewWidget.imgEl.naturalWidth;
+                    const h = previewWidget.imgEl.naturalHeight;
+                    previewWidget.aspectRatio = w / h;
+                    previewWidget.resolutionEl.textContent = `${w} × ${h}`;
+                    previewWidget.resolutionEl.hidden = false;
                     fitHeight(previewNode);
                 };
 
@@ -71,12 +80,15 @@ app.registerExtension({
                 };
 
                 previewWidget.parentEl.appendChild(previewWidget.imgEl);
+                previewWidget.parentEl.appendChild(previewWidget.resolutionEl);
 
                 // Function to clear preview
                 previewWidget.clearPreview = function() {
                     this.imgEl.src = "";
                     this.imgEl.hidden = true;
                     this.parentEl.hidden = true;
+                    this.resolutionEl.hidden = true;
+                    this.resolutionEl.textContent = "";
                     this.aspectRatio = null;
                     fitHeight(previewNode);
                 };
