@@ -1030,7 +1030,7 @@ Subfolders are treated as individual items (unless `scan_subfolders` is enabled)
 
 ---
 
-### Time Converter ⏱️
+### Time Converter 🕥
 
 <details>
 <summary><b><span style="color:#60a5fa;">Click to expand full documentation</span></b></summary>
