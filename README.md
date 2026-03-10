@@ -40,6 +40,7 @@ git clone https://github.com/tetsuoo-online/Comfyui-TOO-Pack
 | [Krita Bridge](#krita-bridge-) | `TOO-Pack/image` | Auto-load images from Krita |
 | [Extract Widget From Node](#extract-widget-from-node-) | `TOO-Pack/utils` | Extract widget values from workflow nodes |
 | [Collection Categorizer](#collection-categorizer-llm-) | `TOO-Pack/utils` | Categorize files with local LLM (Ollama) |
+| [Time Converter](#time-converter-) | `TOO-Pack/utils` | Quick tool for converting seconds/min/hours |
 
 ---
 
@@ -1029,6 +1030,18 @@ Subfolders are treated as individual items (unless `scan_subfolders` is enabled)
 
 ---
 
+### Time Converter ⏱️
+
+<details>
+<summary><b><span style="color:#60a5fa;">Click to expand full documentation</span></b></summary>
+
+A Quick tool for converting seconds/min/hours.
+
+<img width="314" height="261" alt="Image" src="https://github.com/user-attachments/assets/1e7bef9f-74c4-4034-b016-df4dd8d16d20" />
+
+</details>
+
+---
 
 ## 🗺 ToDo
 
