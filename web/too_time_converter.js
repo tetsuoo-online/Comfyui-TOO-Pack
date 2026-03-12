@@ -33,7 +33,6 @@ app.registerExtension({
         nodeType.prototype.onNodeCreated = function () {
             const r = onNodeCreated?.apply(this, arguments);
 
-            // Add display widget after standard widgets are created
             const displayWidget = this.addWidget(
                 "button",
                 "result_display",
@@ -55,7 +54,10 @@ app.registerExtension({
                 const value = parseFloat(valueWidget?.value ?? 0);
                 const unit  = unitWidget?.value ?? "Secondes";
 
-                const formatted = isNaN(value) ? "—" : convertToFormatted(value, unit);
+                // Si _executedFormatted est défini (value connectée), l'utiliser
+                const formatted = node._executedFormatted
+                    ? node._executedFormatted
+                    : (isNaN(value) ? "—" : convertToFormatted(value, unit));
 
                 // Background
                 const radius = 6;
@@ -76,17 +78,20 @@ app.registerExtension({
                 ctx.font = "bold 18px monospace";
                 ctx.textAlign = "center";
                 ctx.textBaseline = "middle";
-                ctx.fillText(formatted, widget_width / 2, y + H / 2+7.5);
+                ctx.fillText(formatted, widget_width / 2, y + H / 2 + 7.5);
                 ctx.textAlign = "left";
                 ctx.textBaseline = "alphabetic";
             };
 
-            // Hook value widget callback for live update
+            // Hook value/unit callbacks pour mise à jour en temps réel
             const hookWidgets = () => {
                 const valueWidget = this.widgets?.find(w => w.name === "value");
                 const unitWidget  = this.widgets?.find(w => w.name === "unit");
 
-                const refresh = () => this.setDirtyCanvas(true, false);
+                const refresh = () => {
+                    this._executedFormatted = null; // reset si on modifie manuellement
+                    this.setDirtyCanvas(true, false);
+                };
 
                 if (valueWidget) {
                     const orig = valueWidget.callback;
@@ -105,10 +110,19 @@ app.registerExtension({
                 }
             };
 
-            // Widgets may not all exist yet at onNodeCreated time
             setTimeout(hookWidgets, 0);
 
             return r;
+        };
+
+        // Mise à jour après exécution (quand value est connecté à un autre node)
+        const onExecuted = nodeType.prototype.onExecuted;
+        nodeType.prototype.onExecuted = function (message) {
+            onExecuted?.apply(this, arguments);
+            if (message?.formatted?.[0]) {
+                this._executedFormatted = message.formatted[0];
+                this.setDirtyCanvas(true);
+            }
         };
     },
 });

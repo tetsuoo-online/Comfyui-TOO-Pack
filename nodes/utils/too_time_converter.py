@@ -3,7 +3,7 @@ import math
 class TOOTimeConverter:
     """
     Convertit une durée (float) en format HHhMMmSSs.
-    L'affichage temps réel est géré côté JS.
+    L'affichage est mis à jour côté JS via onExecuted.
     """
 
     @classmethod
@@ -49,7 +49,10 @@ class TOOTimeConverter:
         else:
             formatted = f"{seconds:02d}s"
 
-        return (formatted, total_seconds_rounded)
+        return {
+            "ui": {"formatted": [formatted]},
+            "result": (formatted, total_seconds_rounded)
+        }
 
 
 NODE_CLASS_MAPPINGS = {
