@@ -212,6 +212,8 @@ The text file should contain one image path per line:
 
 An intelligent image saver that replaces the SAVE_IMG subgraph with flexible filename customization.
 
+<img width="368" height="508" alt="Image" src="https://github.com/user-attachments/assets/a9d9a630-3b53-4ca1-ad43-6a5dd4bae059" />
+
 #### Features
 
 - **Flexible naming**: Customizable prefix, suffix, and separator
