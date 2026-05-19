@@ -1,10 +1,10 @@
 import { app } from "../../scripts/app.js";
 
 app.registerExtension({
-  name: "Comfy.TooLoraGrid",
+  name: "Comfy.LoraGrid",
 
   async beforeRegisterNodeDef(nodeType, nodeData, app) {
-    if (nodeData.name !== "TOO LoRA Grid") return;
+    if (nodeData.name !== "LoRA Grid") return;
 
     const onNodeCreated = nodeType.prototype.onNodeCreated;
     nodeType.prototype.onNodeCreated = function () {
