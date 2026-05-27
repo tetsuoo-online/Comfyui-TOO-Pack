@@ -140,8 +140,10 @@ class TOOSmartImageSaver:
                    output_format, webp_lossless, quality, separator, embed_workflow, save_metadata,
                    metadata=None, workflow=None, prompt=None, extra_pnginfo=None):
         
+        now = datetime.now()
+        
         # Traiter output_folder avec syntaxe date
-        output_folder = self._parse_date_tokens(output_folder)
+        output_folder = self._parse_date_tokens(output_folder, now)
         
         # Nettoyer output_folder des caractères invalides
         output_folder = self._safe_path(output_folder) if output_folder else output_folder
@@ -157,27 +159,27 @@ class TOOSmartImageSaver:
         
         # 1. Prefix (peut contenir tokens date)
         if prefix:
-            prefix = self._parse_date_tokens(prefix)
+            prefix = self._parse_date_tokens(prefix, now)
             filename_parts.append(prefix)
         
         # 2. Extra1
         if extra1:
-            extra1 = self._parse_date_tokens(extra1)
+            extra1 = self._parse_date_tokens(extra1, now)
             filename_parts.append(extra1)
         
         # 3. Extra2
         if extra2:
-            extra2 = self._parse_date_tokens(extra2)
+            extra2 = self._parse_date_tokens(extra2, now)
             filename_parts.append(extra2)
         
         # 4. Model
         if model:
-            model = self._clean_model_name(model)
+            model = self._clean_model_name(model, now)
             filename_parts.append(model)
         
         # 5. Suffix (peut contenir tokens date)
         if suffix:
-            suffix = self._parse_date_tokens(suffix)
+            suffix = self._parse_date_tokens(suffix, now)
             filename_parts.append(suffix)
         
         # Construire le nom final
@@ -425,7 +427,7 @@ class TOOSmartImageSaver:
             return int(width), int(height)
         return None, None
     
-    def _parse_date_tokens(self, text):
+    def _parse_date_tokens(self, text, now=None):
         """
         Remplace les tokens date directement dans le texte.
         Tokens supportés: YYYY, YY, MM, DD, HH, mm, ss, timestamp

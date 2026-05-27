@@ -44,7 +44,8 @@ class FileNaming:
     def _parse_date_tokens(self, text):
         if not text:
             return text
-        now = datetime.now()
+        if now is None:
+            now = datetime.now()
         if 'timestamp' in text:
             text = text.replace('timestamp', str(int(now.timestamp())))
 
@@ -342,10 +343,11 @@ class FileNaming:
             "[any3]": any3_value
         }
 
+        now = datetime.now()
         date_vars = {
-            "%date1": self._parse_date_tokens(config.get("date1", "")),
-            "%date2": self._parse_date_tokens(config.get("date2", "")),
-            "%date3": self._parse_date_tokens(config.get("date3", ""))
+            "%date1": self._parse_date_tokens(config.get("date1", ""), now),
+            "%date2": self._parse_date_tokens(config.get("date2", ""), now),
+            "%date3": self._parse_date_tokens(config.get("date1", ""), now)
         }
 
         meta_dict = {}

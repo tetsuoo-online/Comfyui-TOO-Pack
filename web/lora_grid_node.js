@@ -10,6 +10,7 @@ app.registerExtension({
     nodeType.prototype.onNodeCreated = function () {
       const r = onNodeCreated?.apply(this, arguments);
       this.lora_entries = this.lora_entries || [];
+      this.lora_collapsed = this.lora_collapsed || false;
       this.buildLoraUI();
       return r;
     };
@@ -141,16 +142,27 @@ app.registerExtension({
       const self = this;
       const add = (w) => { w._loraCustom = true; this.widgets.push(w); return w; };
 
+      const arrow = self.lora_collapsed ? "▶" : "▼";
       add({
-        name: `▼ LORAS (${this.lora_entries.length})`, type: "button",
+        name: `${arrow} LORAS (${self.lora_entries.length})`, type: "button",
         computeSize: (w) => [w, 22],
         draw(ctx, node, widget_width, y, H) {
-          ctx.fillStyle = "rgba(0,0,0,0.06)"; ctx.fillRect(0, y, widget_width, H);
+          ctx.fillStyle = "rgba(0,0,0,0.12)"; ctx.fillRect(0, y, widget_width, H);
           ctx.fillStyle = "#ffffff"; ctx.font = "bold 12px Arial";
           ctx.fillText(this.name, 6, y + H * 0.7);
         },
-        callback: () => {}
+        callback: () => {
+          self.lora_collapsed = !self.lora_collapsed;
+          self.buildLoraUI();
+          self.setDirtyCanvas(true, true);
+        }
       });
+
+      if (self.lora_collapsed) {
+        const newSize = this.computeSize();
+        this.setSize([Math.max((this.size || [300])[0], newSize[0], 300), newSize[1]]);
+        return;
+      }
 
       for (let i = 0; i < this.lora_entries.length; i++) {
         const entry = this.lora_entries[i];
@@ -238,11 +250,13 @@ app.registerExtension({
 
     nodeType.prototype.onSerialize = function (o) {
       this._syncEntriesFromWidgets();
-      o.lora_entries = JSON.parse(JSON.stringify(this.lora_entries));
+      o.lora_entries   = JSON.parse(JSON.stringify(this.lora_entries));
+      o.lora_collapsed = this.lora_collapsed;
     };
 
     nodeType.prototype.onConfigure = function (o) {
-      if (Array.isArray(o.lora_entries)) this.lora_entries = o.lora_entries;
+      if (Array.isArray(o.lora_entries)) this.lora_entries   = o.lora_entries;
+      if (o.lora_collapsed !== undefined) this.lora_collapsed = o.lora_collapsed;
       this.buildLoraUI();
     };
 
