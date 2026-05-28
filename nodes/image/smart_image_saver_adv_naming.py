@@ -41,7 +41,7 @@ class FileNaming:
     OUTPUT_NODE = True
     CATEGORY = "🔵TOO-Pack/image"
 
-    def _parse_date_tokens(self, text):
+    def _parse_date_tokens(self, text, now=None):
         if not text:
             return text
         if now is None:
@@ -347,7 +347,7 @@ class FileNaming:
         date_vars = {
             "%date1": self._parse_date_tokens(config.get("date1", ""), now),
             "%date2": self._parse_date_tokens(config.get("date2", ""), now),
-            "%date3": self._parse_date_tokens(config.get("date1", ""), now)
+            "%date3": self._parse_date_tokens(config.get("date3", ""), now)
         }
 
         meta_dict = {}
