@@ -174,7 +174,7 @@ class TOOSmartImageSaver:
         
         # 4. Model
         if model:
-            model = self._clean_model_name(model, now)
+            model = self._clean_model_name(model)
             filename_parts.append(model)
         
         # 5. Suffix (peut contenir tokens date)

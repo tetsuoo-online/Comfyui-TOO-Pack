@@ -3,24 +3,17 @@ LoRA Grid Tester — TOO-Pack
 Compatible avec les modeles image classiques (SD, SDXL, FLUX)
 et les modeles Cosmos/Anima (latent 5D avec T=1).
 
-Sources de LoRA (cumulatives) :
-1. Widget texte multiligne "loras" : une entree par ligne
+Sources de LoRA :
+Widget texte multiligne "loras" : une entree par ligne
    chemin:str_model
-2. Interface JS du node (lora_entries serialisees dans le workflow)
 
-Regles de fusion :
-- Widget seul -> widget uniquement
-- JS seul -> JS uniquement
-- Les deux -> widget d'abord, JS ensuite
-
-Format widget :
+Format :
 chemin/vers/lora.safetensors
 chemin/vers/lora.safetensors:1.0
 chemin/vers/lora.safetensors:"label"  -> lora weight=0, label personnalise
 """
 
 import os
-import json
 import hashlib
 import re
 import numpy as np
@@ -74,10 +67,7 @@ class LoraGrid:
                 "bg_color":      ("STRING", {"default": "#111111"}),
                 "footer_text":        ("STRING", {"default": ""}),
             },
-            "hidden": {
-                "extra_pnginfo": "EXTRA_PNGINFO",
-                "unique_id":     "UNIQUE_ID",
-            },
+
         }
 
     RETURN_TYPES  = ("IMAGE", "IMAGE")
@@ -89,81 +79,16 @@ class LoraGrid:
     def IS_CHANGED(cls, model, clip, vae, positive, negative, latent_image,
                    loras, seed, steps, cfg, sampler_name, scheduler, denoise,
                    grid_cols, grid_padding, add_labels, label_height,
-                   font_size, label_color, bg_color, footer,
-                   extra_pnginfo=None, unique_id=None):
+                   font_size, label_color, bg_color, footer_text):
         latent_hash = hashlib.md5(
             latent_image["samples"].cpu().numpy().tobytes()
         ).hexdigest()[:8]
-        js_str = cls._get_js_entries_raw(extra_pnginfo, unique_id)
-        key = (unique_id,
-               LoraGrid._obj_sig(model), LoraGrid._obj_sig(clip), LoraGrid._obj_sig(vae),
+        key = (LoraGrid._obj_sig(model), LoraGrid._obj_sig(clip), LoraGrid._obj_sig(vae),
                LoraGrid._obj_sig(positive), LoraGrid._obj_sig(negative),
                loras.strip(), seed, steps, round(cfg, 4),
                sampler_name, scheduler, round(denoise, 4),
-               latent_hash, js_str, (footer or "").strip("\n").rstrip())
+               latent_hash, (footer_text or "").strip("\n").rstrip())
         return hashlib.md5(str(key).encode()).hexdigest()
-
-    # ── lecture lora_entries depuis le workflow JSON ──────────────
-
-    @staticmethod
-    def _find_node_in_workflow(extra_pnginfo, unique_id):
-        if not extra_pnginfo or not unique_id:
-            return None
-        try:
-            uid = int(unique_id)
-            workflow = extra_pnginfo.get("workflow", extra_pnginfo)
-            for node in workflow.get("nodes", []):
-                if int(node.get("id", -1)) == uid:
-                    return node
-        except Exception as e:
-            print(f"[LoraGrid] _find_node_in_workflow : {e}")
-        return None
-
-    @classmethod
-    def _get_js_entries_raw(cls, extra_pnginfo, unique_id):
-        node = cls._find_node_in_workflow(extra_pnginfo, unique_id)
-        if node is None:
-            return ""
-        entries = node.get("lora_entries",
-                  node.get("properties", {}).get("lora_entries", []))
-        try:
-            return json.dumps(entries, sort_keys=True)
-        except:
-            return str(entries)
-
-    @classmethod
-    def _get_js_entries(cls, extra_pnginfo, unique_id):
-        node = cls._find_node_in_workflow(extra_pnginfo, unique_id)
-        if node is None:
-            return []
-        raw = node.get("lora_entries",
-              node.get("properties", {}).get("lora_entries", []))
-        if not raw:
-            return []
-        entries = []
-        for e in raw:
-            path_full = str(e.get("path", "")).strip()
-            if not path_full:
-                continue
-
-            m = re.search(r':"([^"]*)"$', path_full)
-            display_label = None
-            is_null = False
-            if m:
-                display_label = m.group(1)
-                is_null = True
-                path_full = path_full[:m.start()].strip()
-
-            if is_null:
-                sm = 0.0
-            else:
-                try: sm = float(e.get("strength_model", 1.0))
-                except: sm = 1.0
-
-            entries.append({"path": path_full, "strength_model": sm,
-                            "display_label": display_label, "is_null": is_null})
-        print(f"[LoraGrid] JS entries : {len(entries)}")
-        return entries
 
     # ── parsing widget texte ──────────────────────────────────────
 
@@ -197,30 +122,19 @@ class LoraGrid:
             entries.append({"path": path, "strength_model": sm, "display_label": display_label, "is_null": is_null})
         return entries
 
-    @staticmethod
-    def _merge_entries(text_entries, js_entries):
-        if text_entries and js_entries:
-            print(f"[LoraGrid] fusion : {len(text_entries)} widget + {len(js_entries)} JS")
-        elif text_entries:
-            print(f"[LoraGrid] source : widget ({len(text_entries)})")
-        elif js_entries:
-            print(f"[LoraGrid] source : JS ({len(js_entries)})")
-        return text_entries + js_entries
-
     # ── cle de cache ─────────────────────────────────────────────
 
     @staticmethod
-    def _cache_key(unique_id, model, clip, vae, positive, negative, loras, seed, steps, cfg,
-                   sampler_name, scheduler, denoise, latent_image, js_str):
+    def _cache_key(model, clip, vae, positive, negative, loras, seed, steps, cfg,
+                   sampler_name, scheduler, denoise, latent_image):
         latent_hash = hashlib.md5(
             latent_image["samples"].cpu().numpy().tobytes()
         ).hexdigest()[:8]
-        raw = (unique_id,
-               LoraGrid._obj_sig(model), LoraGrid._obj_sig(clip), LoraGrid._obj_sig(vae),
+        raw = (LoraGrid._obj_sig(model), LoraGrid._obj_sig(clip), LoraGrid._obj_sig(vae),
                LoraGrid._obj_sig(positive), LoraGrid._obj_sig(negative),
                loras.strip(), seed, steps, round(cfg, 4),
                sampler_name, scheduler, round(denoise, 4),
-               latent_hash, js_str)
+               latent_hash)
         return hashlib.md5(str(raw).encode()).hexdigest()
 
     # ── recherche fichier LoRA ────────────────────────────────────
@@ -266,7 +180,7 @@ class LoraGrid:
         return Image.fromarray(arr[:, :, :3])
 
     def _assemble_grid(self, tensors, labels, cols, padding,
-                       add_labels, label_height, font_size, fg_hex, bg_hex, footer=""):
+                       add_labels, label_height, font_size, fg_hex, bg_hex, footer_text=""):
         pil_images = [self._tensor_to_pil(t) for t in tensors]
         n    = len(pil_images)
         cols = max(1, min(cols, n))
@@ -275,7 +189,7 @@ class LoraGrid:
         cell_w, cell_h = pil_images[0].size
         lh      = label_height if add_labels else 0
 
-        footer = (footer or "").strip("\n").rstrip()
+        footer_text = (footer_text or "").strip("\n").rstrip()
 
         total_w = cols * cell_w + (cols + 1) * padding
         total_h_base = rows * (cell_h + lh) + (rows + 1) * padding
@@ -285,7 +199,7 @@ class LoraGrid:
 
         # Charger la police en avance pour calculer footer_h
         font = None
-        if add_labels or footer:
+        if add_labels or footer_text:
             for name in ("arial.ttf", "DejaVuSans.ttf", "LiberationSans-Regular.ttf"):
                 try: font = ImageFont.truetype(name, font_size); break
                 except: pass
@@ -295,9 +209,9 @@ class LoraGrid:
         # Calcul dynamique de la hauteur du footer (wrap + multilignes)
         footer_lines = []
         footer_h = 0
-        if footer:
+        if footer_text:
             line_h = font_size + 4
-            for raw_line in footer.split("\n"):
+            for raw_line in footer_text.split("\n"):
                 raw_line = raw_line.rstrip()
                 if not raw_line:
                     footer_lines.append("")
@@ -362,23 +276,33 @@ class LoraGrid:
     def generate_grid(self, model, clip, vae, positive, negative, latent_image,
                       loras, seed, steps, cfg, sampler_name, scheduler, denoise,
                       grid_cols, grid_padding, add_labels, label_height,
-                      font_size, label_color, bg_color, footer,
-                      extra_pnginfo=None, unique_id=None):
+                      font_size, label_color, bg_color, footer_text):
 
-        text_entries = self._parse_loras_text(loras)
-        js_entries   = self._get_js_entries(extra_pnginfo, unique_id)
-        lora_entries = self._merge_entries(text_entries, js_entries)
+        lora_entries = self._parse_loras_text(loras)
 
         print(f"[LoraGrid] {len(lora_entries)} LoRA au total")
         if not lora_entries:
-            print("[LoraGrid] Aucune entree LoRA.")
-            blank = torch.zeros(1, 64, 64, 3)
-            return (blank, blank)
+            print("[LoraGrid] Aucune entree LoRA — sample sans LoRA.")
+            try:
+                latent_out = common_ksampler(
+                    model, seed, steps, cfg,
+                    sampler_name, scheduler,
+                    positive, negative, latent_image,
+                    denoise=denoise)[0]
+                decoded = self._vae_decode(vae, latent_out)
+                images_batch = decoded
+                grid = self._assemble_grid(
+                    [decoded[0]], ["no lora"], grid_cols, grid_padding,
+                    add_labels, label_height, font_size, label_color, bg_color, footer_text)
+                return (grid, images_batch)
+            except Exception as e:
+                print(f"[LoraGrid] erreur sample sans LoRA : {e}")
+                blank = torch.zeros(1, 64, 64, 3)
+                return (blank, blank)
 
-        js_str    = self._get_js_entries_raw(extra_pnginfo, unique_id)
-        cache_key = self._cache_key(unique_id, model, clip, vae, positive, negative, loras,
+        cache_key = self._cache_key(model, clip, vae, positive, negative, loras,
                                     seed, steps, cfg, sampler_name, scheduler, denoise,
-                                    latent_image, js_str)
+                                    latent_image)
 
         if cache_key in LoraGrid._cache:
             print(f"[LoraGrid] cache HIT ({cache_key[:8]}…)")
@@ -470,7 +394,7 @@ class LoraGrid:
 
         grid = self._assemble_grid(
             image_tensors, labels, grid_cols, grid_padding,
-            add_labels, label_height, font_size, label_color, bg_color, footer)
+            add_labels, label_height, font_size, label_color, bg_color, footer_text)
 
         print(f"[LoraGrid] grille {grid.shape}, batch {images_batch.shape}")
         return (grid, images_batch)

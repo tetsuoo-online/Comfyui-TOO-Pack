@@ -9,25 +9,9 @@ app.registerExtension({
     const onNodeCreated = nodeType.prototype.onNodeCreated;
     nodeType.prototype.onNodeCreated = function () {
       const r = onNodeCreated?.apply(this, arguments);
-      this.lora_entries = this.lora_entries || [];
-      this.lora_collapsed = this.lora_collapsed || false;
-      this.buildLoraUI();
+      this.picker_collapsed = true;
+      this.buildPickerUI();
       return r;
-    };
-
-    nodeType.prototype._widgetValue = function (name) {
-      const w = this.widgets?.find(w => w.name === name);
-      if (!w) return undefined;
-      return w.inputEl?.value ?? w.value;
-    };
-
-    nodeType.prototype._syncEntriesFromWidgets = function () {
-      for (let i = 0; i < this.lora_entries.length; i++) {
-        const path = this._widgetValue(`path_${i}`);
-        const sm   = this._widgetValue(`str_model_${i}`);
-        if (path !== undefined) this.lora_entries[i].path           = path;
-        if (sm   !== undefined) this.lora_entries[i].strength_model = parseFloat(sm) || sm;
-      }
     };
 
     // ── Widget picker ─────────────────────────────────────────────
@@ -74,7 +58,7 @@ app.registerExtension({
         const rect = canvas.canvas.getBoundingClientRect();
         const gx = (e.clientX - rect.left) / canvas.ds.scale - canvas.ds.offset[0];
         const gy = (e.clientY - rect.top)  / canvas.ds.scale - canvas.ds.offset[1];
-        const nodes = graph._nodes || [];
+        const nodes = (app.canvas.graph?._nodes) || graph._nodes || [];
         let found = null;
         for (let i = nodes.length - 1; i >= 0; i--) {
           const n = nodes[i];
@@ -133,18 +117,17 @@ app.registerExtension({
       document.body.append(bgOverlay, popup);
     };
 
-    // ── UI LoRA ───────────────────────────────────────────────────
+    // ── UI Picker ─────────────────────────────────────────────────
 
-    nodeType.prototype.buildLoraUI = function () {
-      this._syncEntriesFromWidgets();
+    nodeType.prototype.buildPickerUI = function () {
       this.widgets = (this.widgets || []).filter(w => !w._loraCustom);
 
       const self = this;
       const add = (w) => { w._loraCustom = true; this.widgets.push(w); return w; };
 
-      const arrow = self.lora_collapsed ? "▶" : "▼";
+      const arrow = self.picker_collapsed ? "▶" : "▼";
       add({
-        name: `${arrow} LORAS (${self.lora_entries.length})`, type: "button",
+        name: `${arrow} LORA PICKER`, type: "button",
         computeSize: (w) => [w, 22],
         draw(ctx, node, widget_width, y, H) {
           ctx.fillStyle = "rgba(0,0,0,0.12)"; ctx.fillRect(0, y, widget_width, H);
@@ -152,94 +135,34 @@ app.registerExtension({
           ctx.fillText(this.name, 6, y + H * 0.7);
         },
         callback: () => {
-          self.lora_collapsed = !self.lora_collapsed;
-          self.buildLoraUI();
+          self.picker_collapsed = !self.picker_collapsed;
+          self.buildPickerUI();
           self.setDirtyCanvas(true, true);
         }
       });
 
-      if (self.lora_collapsed) {
+      if (self.picker_collapsed) {
         const newSize = this.computeSize();
         this.setSize([Math.max((this.size || [300])[0], newSize[0], 300), newSize[1]]);
         return;
       }
 
-      for (let i = 0; i < this.lora_entries.length; i++) {
-        const entry = this.lora_entries[i];
-
-        add({
-          name: `── LoRA ${i + 1} ──`, type: "button", serialize: false,
-          computeSize: (w) => [w, 18],
-          draw(ctx, node, widget_width, y, H) {
-            ctx.fillStyle = "rgba(255,255,255,0.04)"; ctx.fillRect(0, y, widget_width, H);
-            ctx.fillStyle = "#888"; ctx.font = "11px Arial"; ctx.textAlign = "center";
-            ctx.fillText(this.name, widget_width * 0.5, y + H * 0.72);
-            ctx.textAlign = "left";
-          },
-          callback: () => {}
-        });
-
-        const pathW = add({
-          name: `path_${i}`, type: "string", value: entry.path ?? "",
-          computeSize: (w) => [w, 20],
-          callback: (v) => { pathW.value = v; self.lora_entries[i].path = v; }
-        });
-
-        add({
-          name: `pick_${i}`, type: "button", serialize: false,
-          computeSize: (w) => [w, 20],
-          draw(ctx, node, widget_width, y, H) {
-            ctx.fillStyle = "rgba(68,138,255,0.1)"; ctx.fillRect(2, y+1, widget_width-4, H-2);
-            ctx.fillStyle = "#4a9eff"; ctx.font = "11px Arial"; ctx.textAlign = "center";
-            ctx.fillText("🔗 Pick Widget", widget_width*0.5, y+H*0.65);
-            ctx.textAlign = "left";
-          },
-          callback: () => self.startPicking(pathW)
-        });
-
-        const smW = add({
-          name: `str_model_${i}`, type: "string", value: String(entry.strength_model ?? 1.0),
-          computeSize: (w) => [w, 20],
-          callback: (v) => {
-            const n = Math.max(-4, Math.min(4, parseFloat(v)));
-            smW.value = isNaN(n) ? smW.value : String(n);
-            if (!isNaN(n)) self.lora_entries[i].strength_model = n;
-          }
-        });
-
-        add({
-          name: `remove_${i}`, type: "button", serialize: false,
-          computeSize: (w) => [w, 22],
-          draw(ctx, node, widget_width, y, H) {
-            ctx.fillStyle = "rgba(255,68,68,0.08)"; ctx.fillRect(2, y+1, widget_width-4, H-2);
-            ctx.fillStyle = "#ff6060"; ctx.font = "12px Arial"; ctx.textAlign = "center";
-            ctx.fillText(`❌ Remove LoRA ${i + 1}`, widget_width*0.5, y+H*0.65);
-            ctx.textAlign = "left";
-          },
-          callback: () => {
-            self._syncEntriesFromWidgets();
-            self.lora_entries.splice(i, 1);
-            self.buildLoraUI();
-            self.setDirtyCanvas(true, true);
-          }
-        });
-      }
+      const pathW = add({
+        name: "lora_path", type: "string", value: "",
+        computeSize: (w) => [w, 20],
+        callback: (v) => { pathW.value = v; }
+      });
 
       add({
-        name: "add_lora", type: "button", serialize: false,
-        computeSize: (w) => [w, 22],
+        name: "pick_lora", type: "button", serialize: false,
+        computeSize: (w) => [w, 20],
         draw(ctx, node, widget_width, y, H) {
-          ctx.fillStyle = "rgba(68,225,68,0.06)"; ctx.fillRect(2, y+1, widget_width-4, H-2);
-          ctx.fillStyle = "#60cc60"; ctx.font = "12px Arial"; ctx.textAlign = "center";
-          ctx.fillText("➕ Add LoRA", widget_width*0.5, y+H*0.65);
+          ctx.fillStyle = "rgba(68,138,255,0.1)"; ctx.fillRect(2, y+1, widget_width-4, H-2);
+          ctx.fillStyle = "#4a9eff"; ctx.font = "11px Arial"; ctx.textAlign = "center";
+          ctx.fillText("🔗 Pick Widget", widget_width*0.5, y+H*0.65);
           ctx.textAlign = "left";
         },
-        callback: () => {
-          self._syncEntriesFromWidgets();
-          self.lora_entries.push({ path: "", strength_model: 1.0 });
-          self.buildLoraUI();
-          self.setDirtyCanvas(true, true);
-        }
+        callback: () => self.startPicking(pathW)
       });
 
       const newSize = this.computeSize();
@@ -249,15 +172,12 @@ app.registerExtension({
     // ── Serialisation ─────────────────────────────────────────────
 
     nodeType.prototype.onSerialize = function (o) {
-      this._syncEntriesFromWidgets();
-      o.lora_entries   = JSON.parse(JSON.stringify(this.lora_entries));
-      o.lora_collapsed = this.lora_collapsed;
+      o.picker_collapsed = this.picker_collapsed;
     };
 
     nodeType.prototype.onConfigure = function (o) {
-      if (Array.isArray(o.lora_entries)) this.lora_entries   = o.lora_entries;
-      if (o.lora_collapsed !== undefined) this.lora_collapsed = o.lora_collapsed;
-      this.buildLoraUI();
+      if (o.picker_collapsed !== undefined) this.picker_collapsed = o.picker_collapsed;
+      this.buildPickerUI();
     };
 
   },
