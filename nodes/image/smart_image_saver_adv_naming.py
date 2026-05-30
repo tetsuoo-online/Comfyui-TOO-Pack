@@ -517,6 +517,29 @@ class FileNaming:
 
         return (images, saved_paths[0] if saved_paths else "")
 
+    def _find_node_recursive(self, nodes, unique_id=None, definitions=None):
+        if unique_id is not None:
+            uid = str(unique_id).rsplit(":", 1)[-1]  # '8742:8751' → '8751'
+        else:
+            uid = None
+
+        for node in nodes:
+            if uid and str(node.get("id", "")) == uid:
+                return node
+            subgraph = node.get("subgraph") or node.get("data", {}).get("subgraph")
+            if subgraph:
+                found = self._find_node_recursive(subgraph.get("nodes", []), unique_id, definitions)
+                if found:
+                    return found
+
+        if definitions:
+            for sg in definitions.get("subgraphs", []):
+                found = self._find_node_recursive(sg.get("nodes", []), unique_id)
+                if found:
+                    return found
+
+        return None
+
     def _get_config(self, extra_pnginfo, unique_id=None):
         config = {
             "separator": "_",
@@ -537,21 +560,13 @@ class FileNaming:
             try:
                 wf = json.loads(extra_pnginfo["workflow"]) if isinstance(extra_pnginfo["workflow"], str) else extra_pnginfo["workflow"]
                 nodes = wf.get("nodes", [])
-                target_node = None
-
-                # Chercher d'abord par unique_id
-                if unique_id is not None:
-                    uid = str(unique_id)
-                    for node in nodes:
-                        if str(node.get("id", "")) == uid:
-                            target_node = node
-                            break
-
+                definitions = wf.get("definitions", {})
+                target_node = self._find_node_recursive(nodes, unique_id, definitions)
                 if target_node:
                     config.update(target_node.get("properties", {}))
                     config["text_replace_pairs"] = target_node.get("text_replace_pairs", [])
                     config["data_fields"] = target_node.get("data_fields", [])
-            except:
+            except Exception as e:
                 pass
 
         return config
