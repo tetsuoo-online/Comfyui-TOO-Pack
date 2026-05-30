@@ -115,11 +115,15 @@ class LoraGrid:
 
             if is_null:
                 sm = 0.0
+                has_explicit_weight = False
             else:
-                try:    sm = float(parts[1]) if len(parts) > 1 and parts[1].strip() else 1.0
-                except: sm = 1.0
+                if len(parts) > 1 and parts[1].strip():
+                    try:    sm = float(parts[1]); has_explicit_weight = True
+                    except: sm = 1.0; has_explicit_weight = False
+                else:
+                    sm = 1.0; has_explicit_weight = False
 
-            entries.append({"path": path, "strength_model": sm, "display_label": display_label, "is_null": is_null})
+            entries.append({"path": path, "strength_model": sm, "display_label": display_label, "is_null": is_null, "has_explicit_weight": has_explicit_weight})
         return entries
 
     # ── cle de cache ─────────────────────────────────────────────
@@ -317,8 +321,13 @@ class LoraGrid:
                 is_null  = entry.get("is_null", False)
                 dlabel   = entry.get("display_label")
 
-                lbl = dlabel if dlabel is not None \
-                      else os.path.splitext(os.path.basename(path_raw))[0]
+                has_explicit_weight = entry.get("has_explicit_weight", False)
+                if dlabel is not None:
+                    lbl = dlabel
+                elif has_explicit_weight:
+                    lbl = f"{os.path.splitext(os.path.basename(path_raw))[0]}:{sm:g}"
+                else:
+                    lbl = os.path.splitext(os.path.basename(path_raw))[0]
 
                 if is_null:
                     print(f"[LoraGrid] #{i} null slot → '{lbl}'")
