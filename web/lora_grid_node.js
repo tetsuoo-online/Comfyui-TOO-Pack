@@ -4,7 +4,7 @@ app.registerExtension({
   name: "Comfy.LoraGrid",
 
   async beforeRegisterNodeDef(nodeType, nodeData, app) {
-    if (nodeData.name !== "LoRA Grid") return;
+    if (nodeData.name !== "LoRA Grid" && nodeData.name !== "LoRA Grid Advanced") return;
 
     const onNodeCreated = nodeType.prototype.onNodeCreated;
     nodeType.prototype.onNodeCreated = function () {
