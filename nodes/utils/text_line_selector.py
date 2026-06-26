@@ -8,7 +8,7 @@ class TextLineSelector:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "prompt": ("STRING", {"multiline": True, "default": "text"}),
+                "prompt": ("STRING", {"multiline": True, "default": ""}),
                 "start_index": ("INT", {"default": 0, "min": 0, "max": 9999}),
                 "max_rows": ("INT", {"default": 1000, "min": 1, "max": 9999}),
                 "range_str": ("STRING", {

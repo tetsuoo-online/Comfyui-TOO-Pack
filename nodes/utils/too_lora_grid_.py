@@ -1,16 +1,7 @@
 """
-LoRA Grid Tester (Advanced) — TOO-Pack
-Variante de LoRA Grid pour les pipelines de sampling avances
-(RandomNoise / GUIDER / SamplerCustomAdvanced), incompatibles
-avec common_ksampler (cfg/sampler_name/scheduler/denoise).
-
-Le node prend directement noise/guider/sampler/sigmas en entree.
-Pour chaque LoRA, TOUS les ModelPatcher portes par le guider sont
-detectes par introspection (attribut "model_patcher", mais aussi
-"uncond_model_patcher" pour Guider_DualModel, etc.) puis clones et
-patches avec le LoRA. Un nouveau guider (copie superficielle) reutilise
-ensuite les conds/cfg deja en place — sans avoir besoin de connaitre
-le type exact du guider ni de le reconstruire depuis zero.
+LoRA Grid Tester — TOO-Pack
+Compatible avec les modeles image classiques (SD, SDXL, FLUX)
+et les modeles Cosmos/Anima (latent 5D avec T=1).
 
 Sources de LoRA :
 Widget texte multiligne "loras" : une entree par ligne
@@ -23,21 +14,18 @@ chemin/vers/lora.safetensors:"label"  -> lora weight=0, label personnalise
 """
 
 import os
-import re
-import copy
 import hashlib
+import re
 import numpy as np
-import torch
+from PIL import Image, ImageDraw, ImageFont
 import folder_paths
 import comfy.utils
 import comfy.sd
-import comfy.sample
-import comfy.model_management
-import comfy.model_patcher
-from PIL import Image, ImageDraw, ImageFont
+import comfy.samplers
+import torch
+from nodes import common_ksampler
 
-
-class LoraGridAdvanced:
+class LoraGrid:
 
     _cache: dict = {}
 
@@ -50,20 +38,50 @@ class LoraGridAdvanced:
         except Exception:
             return id(obj)
 
+    @staticmethod
+    def _cond_sig(cond):
+        """Signature stable d'un CONDITIONING (liste de [tensor, dict]), basee sur
+        le contenu reel des embeddings — pas sur l'id() du wrapper Python."""
+        if not isinstance(cond, (list, tuple)):
+            return "no_cond"
+        h = hashlib.md5()
+        any_t = False
+        for c in cond:
+            if not isinstance(c, (list, tuple)) or not c:
+                continue
+            t = c[0]
+            if isinstance(t, torch.Tensor):
+                any_t = True
+                h.update(str(tuple(t.shape)).encode())
+                h.update(t.detach().cpu().contiguous().view(-1).float().numpy().tobytes())
+            extra = c[1] if len(c) > 1 and isinstance(c[1], dict) else {}
+            pooled = extra.get("pooled_output")
+            if isinstance(pooled, torch.Tensor):
+                any_t = True
+                h.update(b"pooled")
+                h.update(pooled.detach().cpu().contiguous().view(-1).float().numpy().tobytes())
+        return h.hexdigest()[:16] if any_t else "no_cond"
+
     @classmethod
     def INPUT_TYPES(cls):
         return {
             "required": {
+                "model":         ("MODEL",),
+                "clip":          ("CLIP",),
                 "vae":           ("VAE",),
-                "noise":         ("NOISE",),
-                "guider":        ("GUIDER",),
-                "sampler":       ("SAMPLER",),
-                "sigmas":        ("SIGMAS",),
+                "positive":      ("CONDITIONING",),
+                "negative":      ("CONDITIONING",),
                 "latent_image":  ("LATENT",),
                 "loras": ("STRING", {
                     "multiline": True,
                     "default":   "# path:str_model\n# ex: my_lora.safetensors:1.0\n# ex: my_lora.safetensors:\"no lora\""
                 }),
+                "seed":          ("INT",   {"default": 0,    "min": 0,   "max": 0xffffffffffffffff}),
+                "steps":         ("INT",   {"default": 20,   "min": 1,   "max": 10000}),
+                "cfg":           ("FLOAT", {"default": 7.0,  "min": 0.0, "max": 100.0, "step": 0.1}),
+                "sampler_name":  (comfy.samplers.KSampler.SAMPLERS,),
+                "scheduler":     (comfy.samplers.KSampler.SCHEDULERS,),
+                "denoise":       ("FLOAT", {"default": 1.0,  "min": 0.0, "max": 1.0,   "step": 0.01}),
                 "grid_cols":     ("INT",   {"default": 4,    "min": 1,   "max": 16}),
                 "grid_padding":  ("INT",   {"default": 4,    "min": 0,   "max": 64}),
                 "add_labels":    ("BOOLEAN", {"default": True}),
@@ -81,6 +99,21 @@ class LoraGridAdvanced:
     FUNCTION      = "generate_grid"
     CATEGORY      = "\U0001f535TOO-Pack/utils"
 
+    @classmethod
+    def IS_CHANGED(cls, model, clip, vae, positive, negative, latent_image,
+                   loras, seed, steps, cfg, sampler_name, scheduler, denoise,
+                   grid_cols, grid_padding, add_labels, label_height,
+                   font_size, label_color, bg_color, footer_text):
+        latent_hash = hashlib.md5(
+            latent_image["samples"].cpu().numpy().tobytes()
+        ).hexdigest()[:8]
+        key = (LoraGrid._obj_sig(model), LoraGrid._obj_sig(clip), LoraGrid._obj_sig(vae),
+               LoraGrid._cond_sig(positive), LoraGrid._cond_sig(negative),
+               loras.strip(), seed, steps, round(cfg, 4),
+               sampler_name, scheduler, round(denoise, 4),
+               latent_hash, (footer_text or "").strip("\n").rstrip())
+        return hashlib.md5(str(key).encode()).hexdigest()
+
     # ── parsing widget texte ──────────────────────────────────────
 
     @staticmethod
@@ -90,6 +123,7 @@ class LoraGridAdvanced:
             line = raw_line.strip()
             if not line or line.startswith("#"):
                 continue
+
             m = re.search(r':"([^"]*)"$', line)
             display_label = None
             is_null = False
@@ -97,10 +131,12 @@ class LoraGridAdvanced:
                 display_label = m.group(1)
                 is_null = True
                 line = line[:m.start()]
+
             parts = line.split(":")
             path = parts[0].strip()
             if not path:
                 continue
+
             if is_null:
                 sm = 0.0
                 has_explicit_weight = False
@@ -110,8 +146,24 @@ class LoraGridAdvanced:
                     except: sm = 1.0; has_explicit_weight = False
                 else:
                     sm = 1.0; has_explicit_weight = False
+
             entries.append({"path": path, "strength_model": sm, "display_label": display_label, "is_null": is_null, "has_explicit_weight": has_explicit_weight})
         return entries
+
+    # ── cle de cache ─────────────────────────────────────────────
+
+    @staticmethod
+    def _cache_key(model, clip, vae, positive, negative, loras, seed, steps, cfg,
+                   sampler_name, scheduler, denoise, latent_image):
+        latent_hash = hashlib.md5(
+            latent_image["samples"].cpu().numpy().tobytes()
+        ).hexdigest()[:8]
+        raw = (LoraGrid._obj_sig(model), LoraGrid._obj_sig(clip), LoraGrid._obj_sig(vae),
+               LoraGrid._cond_sig(positive), LoraGrid._cond_sig(negative),
+               loras.strip(), seed, steps, round(cfg, 4),
+               sampler_name, scheduler, round(denoise, 4),
+               latent_hash)
+        return hashlib.md5(str(raw).encode()).hexdigest()
 
     # ── recherche fichier LoRA ────────────────────────────────────
 
@@ -173,6 +225,7 @@ class LoraGridAdvanced:
         bg_rgb    = self._hex_to_rgb(bg_hex)
         label_rgb = self._hex_to_rgb(fg_hex)
 
+        # Charger la police en avance pour calculer footer_h
         font = None
         if add_labels or footer_text:
             for name in ("arial.ttf", "DejaVuSans.ttf", "LiberationSans-Regular.ttf"):
@@ -181,6 +234,7 @@ class LoraGridAdvanced:
             if font is None:
                 font = ImageFont.load_default()
 
+        # Calcul dynamique de la hauteur du footer (wrap + multilignes)
         footer_lines = []
         footer_h = 0
         if footer_text:
@@ -190,6 +244,7 @@ class LoraGridAdvanced:
                 if not raw_line:
                     footer_lines.append("")
                     continue
+                # wrap si le texte dépasse la largeur
                 words = raw_line.split(" ")
                 current = ""
                 for word in words:
@@ -244,154 +299,24 @@ class LoraGridAdvanced:
         arr = np.array(grid).astype(np.float32) / 255.0
         return torch.from_numpy(arr).unsqueeze(0)
 
-    # ── introspection des ModelPatcher portes par le guider ─────────
-
-    @staticmethod
-    def _model_patcher_attrs(guider):
-        """Detecte tous les attributs ModelPatcher du guider (model_patcher,
-        uncond_model_patcher pour Guider_DualModel, etc.) afin de patcher le
-        LoRA sur tous les modeles reellement utilises au sampling, quel que
-        soit le type de guider (CFGGuider, Guider_DualModel, ou autre)."""
-        return [name for name, value in vars(guider).items()
-                if isinstance(value, comfy.model_patcher.ModelPatcher)]
-
-    # ── signature des conditionings (prompts) du guider ─────────────
-
-    @staticmethod
-    def _iter_cond_tensors(guider):
-        """Itere sur les tensors d'embedding des conditionings portes par le
-        guider (positive/negative), sans jamais toucher aux poids des modeles.
-        Couvre CFGGuider (original_conds) et les guiders custom (DualModel...)
-        qui stockent les conds dans un dict *cond* ou en attributs liste."""
-        def emit(cond_list):
-            if not isinstance(cond_list, (list, tuple)):
-                return
-            for c in cond_list:
-                if isinstance(c, dict):                       # format converti
-                    t = c.get("cross_attn")
-                    if isinstance(t, torch.Tensor):
-                        yield t
-                    mc = c.get("model_conds")
-                    if isinstance(mc, dict):
-                        for cobj in mc.values():
-                            ct = getattr(cobj, "cond", None)
-                            if isinstance(ct, torch.Tensor):
-                                yield ct
-                elif isinstance(c, (list, tuple)) and c and isinstance(c[0], torch.Tensor):
-                    yield c[0]                                # format brut [tensor, {...}]
-
-        oc = getattr(guider, "original_conds", None)
-        if isinstance(oc, dict):
-            for key in sorted(oc.keys(), key=str):
-                yield from emit(oc[key])
-
-        for name, value in vars(guider).items():
-            if value is oc:
-                continue
-            low = name.lower()
-            if isinstance(value, dict) and "cond" in low:
-                for key in sorted(value.keys(), key=str):
-                    yield from emit(value[key])
-            elif isinstance(value, (list, tuple)) and any(
-                    k in low for k in ("cond", "positive", "negative")):
-                yield from emit(value)
-
-    @classmethod
-    def _cond_sig(cls, guider):
-        h = hashlib.md5()
-        any_t = False
-        for t in cls._iter_cond_tensors(guider):
-            try:
-                arr = t.detach().cpu().contiguous().view(-1).float().numpy()
-            except Exception:
-                continue
-            any_t = True
-            h.update(str(tuple(t.shape)).encode())
-            h.update(arr.tobytes())
-        return h.hexdigest()[:16] if any_t else "no_cond"
-
-    @classmethod
-    def IS_CHANGED(cls, vae, noise, guider, sampler, sigmas, latent_image,
-                   loras, grid_cols, grid_padding, add_labels, label_height,
-                   font_size, label_color, bg_color, footer_text):
-        latent_hash = hashlib.md5(
-            latent_image["samples"].cpu().numpy().tobytes()
-        ).hexdigest()[:8]
-        sigmas_hash = hashlib.md5(sigmas.cpu().numpy().tobytes()).hexdigest()[:8]
-        model_sigs = tuple(cls._obj_sig(getattr(guider, n)) for n in cls._model_patcher_attrs(guider))
-        key = (model_sigs, cls._obj_sig(vae), cls._obj_sig(sampler),
-               sigmas_hash, getattr(noise, "seed", None),
-               cls._cond_sig(guider),
-               loras.strip(), latent_hash,
-               (footer_text or "").strip("\n").rstrip())
-        return hashlib.md5(str(key).encode()).hexdigest()
-
-    # ── cle de cache ─────────────────────────────────────────────
-
-    @classmethod
-    def _cache_key(cls, guider, sampler, sigmas, noise, loras, latent_image):
-        latent_hash = hashlib.md5(
-            latent_image["samples"].cpu().numpy().tobytes()
-        ).hexdigest()[:8]
-        sigmas_hash = hashlib.md5(sigmas.cpu().numpy().tobytes()).hexdigest()[:8]
-        model_sigs = tuple(cls._obj_sig(getattr(guider, n)) for n in cls._model_patcher_attrs(guider))
-        raw = (model_sigs, cls._obj_sig(sampler),
-               sigmas_hash, getattr(noise, "seed", None),
-               cls._cond_sig(guider),
-               loras.strip(), latent_hash)
-        return hashlib.md5(str(raw).encode()).hexdigest()
-
-    # ── sampling via guider ────────────────────────────────────────
-
-    @staticmethod
-    def _run_sample(active_guider, noise, latent, sampler, sigmas, noise_mask):
-        gen_noise = noise.generate_noise(latent)
-        disable_pbar = not comfy.utils.PROGRESS_BAR_ENABLED
-        samples = active_guider.sample(
-            gen_noise, latent["samples"], sampler, sigmas,
-            denoise_mask=noise_mask, callback=None,
-            disable_pbar=disable_pbar, seed=getattr(noise, "seed", None))
-        samples = samples.to(comfy.model_management.intermediate_device())
-        out = latent.copy()
-        out["samples"] = samples
-        return out
-
-    @staticmethod
-    def _build_lora_guider(guider, model_attrs, weights, sm):
-        """Clone le guider et patche le LoRA sur chacun de ses ModelPatcher
-        (model_patcher seul pour CFGGuider, +uncond_model_patcher pour
-        Guider_DualModel, etc.)."""
-        guider_lora = copy.copy(guider)
-        for attr_name in model_attrs:
-            base_mp = getattr(guider, attr_name)
-            patched_mp, _ = comfy.sd.load_lora_for_models(base_mp, None, weights, sm, 1.0)
-            setattr(guider_lora, attr_name, patched_mp)
-        guider_lora.model_options = guider_lora.model_patcher.model_options
-        return guider_lora
-
     # ── main ──────────────────────────────────────────────────────
 
-    def generate_grid(self, vae, noise, guider, sampler, sigmas, latent_image,
-                      loras, grid_cols, grid_padding, add_labels, label_height,
+    def generate_grid(self, model, clip, vae, positive, negative, latent_image,
+                      loras, seed, steps, cfg, sampler_name, scheduler, denoise,
+                      grid_cols, grid_padding, add_labels, label_height,
                       font_size, label_color, bg_color, footer_text):
 
         lora_entries = self._parse_loras_text(loras)
 
-        print(f"[LoraGridAdvanced] {len(lora_entries)} LoRA au total")
-
-        model_attrs = self._model_patcher_attrs(guider)
-        print(f"[LoraGridAdvanced] modeles detectes sur le guider : {model_attrs}")
-
-        base_model = guider.model_patcher
-        fixed_samples = comfy.sample.fix_empty_latent_channels(base_model, latent_image["samples"])
-        latent = latent_image.copy()
-        latent["samples"] = fixed_samples
-        noise_mask = latent.get("noise_mask")
-
+        print(f"[LoraGrid] {len(lora_entries)} LoRA au total")
         if not lora_entries:
-            print("[LoraGridAdvanced] Aucune entree LoRA — sample sans LoRA.")
+            print("[LoraGrid] Aucune entree LoRA — sample sans LoRA.")
             try:
-                latent_out = self._run_sample(guider, noise, latent, sampler, sigmas, noise_mask)
+                latent_out = common_ksampler(
+                    model, seed, steps, cfg,
+                    sampler_name, scheduler,
+                    positive, negative, latent_image,
+                    denoise=denoise)[0]
                 decoded = self._vae_decode(vae, latent_out)
                 images_batch = decoded
                 grid = self._assemble_grid(
@@ -399,17 +324,19 @@ class LoraGridAdvanced:
                     add_labels, label_height, font_size, label_color, bg_color, footer_text)
                 return (grid, images_batch)
             except Exception as e:
-                print(f"[LoraGridAdvanced] erreur sample sans LoRA : {e}")
+                print(f"[LoraGrid] erreur sample sans LoRA : {e}")
                 blank = torch.zeros(1, 64, 64, 3)
                 return (blank, blank)
 
-        cache_key = self._cache_key(guider, sampler, sigmas, noise, loras, latent_image)
+        cache_key = self._cache_key(model, clip, vae, positive, negative, loras,
+                                    seed, steps, cfg, sampler_name, scheduler, denoise,
+                                    latent_image)
 
-        if cache_key in LoraGridAdvanced._cache:
-            print(f"[LoraGridAdvanced] cache HIT ({cache_key[:8]}…)")
-            cached = LoraGridAdvanced._cache[cache_key]
+        if cache_key in LoraGrid._cache:
+            print(f"[LoraGrid] cache HIT ({cache_key[:8]}…)")
+            cached = LoraGrid._cache[cache_key]
         else:
-            print(f"[LoraGridAdvanced] cache MISS ({cache_key[:8]}…) — sampling")
+            print(f"[LoraGrid] cache MISS ({cache_key[:8]}…) — sampling")
             cached = []
 
             for i, entry in enumerate(lora_entries, start=1):
@@ -418,48 +345,60 @@ class LoraGridAdvanced:
                 is_null  = entry.get("is_null", False)
                 dlabel   = entry.get("display_label")
 
-                lbl = dlabel if dlabel is not None \
-                      else os.path.splitext(os.path.basename(path_raw))[0]
-                if entry.get("has_explicit_weight"):
-                    lbl = f"{lbl}:{sm:g}"
+                has_explicit_weight = entry.get("has_explicit_weight", False)
+                if dlabel is not None:
+                    lbl = dlabel
+                elif has_explicit_weight:
+                    lbl = f"{os.path.splitext(os.path.basename(path_raw))[0]}:{sm:g}"
+                else:
+                    lbl = os.path.splitext(os.path.basename(path_raw))[0]
 
                 if is_null:
-                    print(f"[LoraGridAdvanced] #{i} null slot → '{lbl}'")
+                    print(f"[LoraGrid] #{i} null slot → '{lbl}'")
                     try:
-                        latent_out = self._run_sample(guider, noise, latent, sampler, sigmas, noise_mask)
+                        latent_out = common_ksampler(
+                            model, seed, steps, cfg,
+                            sampler_name, scheduler,
+                            positive, negative, latent_image,
+                            denoise=denoise)[0]
                     except Exception as e:
                         import traceback
-                        print(f"[LoraGridAdvanced] erreur sampling null #{i} : {e}")
+                        print(f"[LoraGrid] erreur sampling null #{i} : {e}")
                         traceback.print_exc()
                         continue
                     try:
                         decoded = self._vae_decode(vae, latent_out)
                     except Exception as e:
-                        print(f"[LoraGridAdvanced] erreur VAE decode null #{i} : {e}")
+                        print(f"[LoraGrid] erreur VAE decode null #{i} : {e}")
                         continue
                     cached.append((decoded[0].clone(), lbl))
-                    print(f"[LoraGridAdvanced] OK #{len(cached)} (null) {decoded.shape}")
+                    print(f"[LoraGrid] OK #{len(cached)} (null) {decoded.shape}")
                     continue
 
                 lora_full = self._find_lora(path_raw)
                 if not lora_full:
-                    print(f"[LoraGridAdvanced] #{i} introuvable : {path_raw!r}")
+                    print(f"[LoraGrid] #{i} introuvable : {path_raw!r}")
                     continue
 
-                print(f"[LoraGridAdvanced] #{i} {os.path.basename(lora_full)} strength={sm}")
+                print(f"[LoraGrid] #{i} {os.path.basename(lora_full)} strength={sm}")
 
                 try:
                     weights = comfy.utils.load_torch_file(lora_full, safe_load=True)
-                    guider_lora = self._build_lora_guider(guider, model_attrs, weights, sm)
+                    model_lora, _ = comfy.sd.load_lora_for_models(
+                        model, clip, weights, sm, 1.0)
                 except Exception as e:
-                    print(f"[LoraGridAdvanced] erreur chargement/patch #{i} : {e}")
+                    print(f"[LoraGrid] erreur chargement #{i} : {e}")
                     continue
 
                 try:
-                    latent_out = self._run_sample(guider_lora, noise, latent, sampler, sigmas, noise_mask)
+                    latent_out = common_ksampler(
+                        model_lora, seed, steps, cfg,
+                        sampler_name, scheduler,
+                        positive, negative, latent_image,
+                        denoise=denoise)[0]
                 except Exception as e:
                     import traceback
-                    print(f"[LoraGridAdvanced] erreur sampling #{i} : {e}")
+                    print(f"[LoraGrid] erreur sampling #{i} : {e}")
                     traceback.print_exc()
                     continue
 
@@ -467,18 +406,18 @@ class LoraGridAdvanced:
                     decoded = self._vae_decode(vae, latent_out)
                 except Exception as e:
                     import traceback
-                    print(f"[LoraGridAdvanced] erreur VAE decode #{i} : {e}")
+                    print(f"[LoraGrid] erreur VAE decode #{i} : {e}")
                     traceback.print_exc()
                     continue
 
                 cached.append((decoded[0].clone(), lbl))
-                print(f"[LoraGridAdvanced] OK #{len(cached)} {decoded.shape}")
+                print(f"[LoraGrid] OK #{len(cached)} {decoded.shape}")
 
-            LoraGridAdvanced._cache[cache_key] = cached
-            print(f"[LoraGridAdvanced] {len(cached)} images en cache ({cache_key[:8]}…)")
+            LoraGrid._cache[cache_key] = cached
+            print(f"[LoraGrid] {len(cached)} images en cache ({cache_key[:8]}…)")
 
         if not cached:
-            print("[LoraGridAdvanced] Aucune image produite.")
+            print("[LoraGrid] Aucune image produite.")
             blank = torch.zeros(1, 64, 64, 3)
             return (blank, blank)
 
@@ -490,14 +429,14 @@ class LoraGridAdvanced:
             image_tensors, labels, grid_cols, grid_padding,
             add_labels, label_height, font_size, label_color, bg_color, footer_text)
 
-        print(f"[LoraGridAdvanced] grille {grid.shape}, batch {images_batch.shape}")
+        print(f"[LoraGrid] grille {grid.shape}, batch {images_batch.shape}")
         return (grid, images_batch)
 
 
 NODE_CLASS_MAPPINGS = {
-    "LoRA Grid Advanced": LoraGridAdvanced,
+    "LoRA Grid": LoraGrid,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "LoRA Grid Advanced": "\U0001f9ea TOO LoRA Grid (Advanced)",
+    "LoRA Grid": "\U0001f9ea TOO LoRA Grid",
 }

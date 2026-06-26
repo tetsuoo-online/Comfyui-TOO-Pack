@@ -18,7 +18,8 @@ app.registerExtension({
                     crop_top: 0,
                     crop_bottom: 0,
                     box_color: "#4a9eff",
-                    show_grid: true
+                    show_grid: true,
+                    show_handles: true
                 }, this.properties);
 
                 // State
@@ -307,6 +308,12 @@ app.registerExtension({
                 };
             };
 
+            // Get handle toggle button rect
+            nodeType.prototype.getHandleToggleBtn = function(displayRect) {
+                if (!displayRect) return null;
+                return { x: displayRect.x + displayRect.width - 18, y: displayRect.y + 2, w: 16, h: 16 };
+            };
+
             // Convert canvas coords to image coords
             nodeType.prototype.canvasToImage = function(canvasX, canvasY, displayRect) {
                 const scaleX = this.imageWidth / displayRect.width;
@@ -340,6 +347,16 @@ app.registerExtension({
                 if (!displayRect) return;
 
                 const cropRect = this.getCropRect(displayRect);
+
+                // Toggle button click
+                const toggleBtn = this.getHandleToggleBtn(displayRect);
+                if (toggleBtn && localPos[0] >= toggleBtn.x && localPos[0] <= toggleBtn.x + toggleBtn.w &&
+                    localPos[1] >= toggleBtn.y && localPos[1] <= toggleBtn.y + toggleBtn.h) {
+                    this.properties.show_handles = !this.properties.show_handles;
+                    this.setDirtyCanvas(true, true);
+                    return true;
+                }
+
                 const handle = this.getHandleAt(localPos[0], localPos[1], cropRect);
 
                 if (handle) {
@@ -643,46 +660,62 @@ app.registerExtension({
                 ctx.fillRect(cropRect.x + cropRect.width, cropRect.y, 
                     (displayRect.x + displayRect.width) - (cropRect.x + cropRect.width), cropRect.height);
 
-                // Draw crop box
-                ctx.strokeStyle = this.properties.box_color;
-                ctx.lineWidth = 2;
-                ctx.strokeRect(cropRect.x, cropRect.y, cropRect.width, cropRect.height);
-
-                // Draw grid
-                if (this.properties.show_grid) {
+                // Draw crop box + grid (transparent when hidden)
+                if (this.properties.show_handles) {
                     ctx.strokeStyle = this.properties.box_color;
                     ctx.lineWidth = 1;
-                    ctx.globalAlpha = 0.3;
-                    
-                    // Rule of thirds
-                    const third_w = cropRect.width / 3;
-                    const third_h = cropRect.height / 3;
-                    
-                    ctx.beginPath();
-                    ctx.moveTo(cropRect.x + third_w, cropRect.y);
-                    ctx.lineTo(cropRect.x + third_w, cropRect.y + cropRect.height);
-                    ctx.moveTo(cropRect.x + third_w * 2, cropRect.y);
-                    ctx.lineTo(cropRect.x + third_w * 2, cropRect.y + cropRect.height);
-                    ctx.moveTo(cropRect.x, cropRect.y + third_h);
-                    ctx.lineTo(cropRect.x + cropRect.width, cropRect.y + third_h);
-                    ctx.moveTo(cropRect.x, cropRect.y + third_h * 2);
-                    ctx.lineTo(cropRect.x + cropRect.width, cropRect.y + third_h * 2);
-                    ctx.stroke();
-                    
+                    ctx.strokeRect(cropRect.x, cropRect.y, cropRect.width, cropRect.height);
+
+                    if (this.properties.show_grid) {
+                        ctx.strokeStyle = this.properties.box_color;
+                        ctx.lineWidth = 1;
+                        ctx.globalAlpha = 0.3;
+                        const third_w = cropRect.width / 3;
+                        const third_h = cropRect.height / 3;
+                        ctx.beginPath();
+                        ctx.moveTo(cropRect.x + third_w, cropRect.y);
+                        ctx.lineTo(cropRect.x + third_w, cropRect.y + cropRect.height);
+                        ctx.moveTo(cropRect.x + third_w * 2, cropRect.y);
+                        ctx.lineTo(cropRect.x + third_w * 2, cropRect.y + cropRect.height);
+                        ctx.moveTo(cropRect.x, cropRect.y + third_h);
+                        ctx.lineTo(cropRect.x + cropRect.width, cropRect.y + third_h);
+                        ctx.moveTo(cropRect.x, cropRect.y + third_h * 2);
+                        ctx.lineTo(cropRect.x + cropRect.width, cropRect.y + third_h * 2);
+                        ctx.stroke();
+                        ctx.globalAlpha = 1.0;
+                    }
+                }
+
+                // Draw handles (always functional, opacity varies)
+                {
+                    const handles = this.getHandles(cropRect);
+                    const handleSize = 8;
+                    ctx.globalAlpha = this.properties.show_handles ? 0.75 : 0.15;
+                    ctx.fillStyle = this.properties.box_color;
+                    ctx.strokeStyle = "#ffffff";
+                    ctx.lineWidth = 1;
+                    for (const pos of Object.values(handles)) {
+                        ctx.fillRect(pos.x - handleSize / 2, pos.y - handleSize / 2, handleSize, handleSize);
+                        ctx.strokeRect(pos.x - handleSize / 2, pos.y - handleSize / 2, handleSize, handleSize);
+                    }
                     ctx.globalAlpha = 1.0;
                 }
 
-                // Draw handles
-                const handles = this.getHandles(cropRect);
-                const handleSize = 8;
-
-                ctx.fillStyle = this.properties.box_color;
-                ctx.strokeStyle = "#ffffff";
-                ctx.lineWidth = 2;
-
-                for (const pos of Object.values(handles)) {
-                    ctx.fillRect(pos.x - handleSize / 2, pos.y - handleSize / 2, handleSize, handleSize);
-                    ctx.strokeRect(pos.x - handleSize / 2, pos.y - handleSize / 2, handleSize, handleSize);
+                // Handle toggle button
+                const toggleBtn = this.getHandleToggleBtn(displayRect);
+                if (toggleBtn) {
+                    ctx.fillStyle = this.properties.show_handles ? "rgba(74,158,255,0.85)" : "rgba(40,40,40,0.85)";
+                    ctx.fillRect(toggleBtn.x, toggleBtn.y, toggleBtn.w, toggleBtn.h);
+                    ctx.strokeStyle = this.properties.show_handles ? "#ffffff" : "#666";
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(toggleBtn.x, toggleBtn.y, toggleBtn.w, toggleBtn.h);
+                    ctx.fillStyle = this.properties.show_handles ? "#ffffff" : "#666";
+                    ctx.font = "bold 10px sans-serif";
+                    ctx.textAlign = "center";
+                    ctx.textBaseline = "middle";
+                    ctx.fillText("H", toggleBtn.x + toggleBtn.w / 2, toggleBtn.y + toggleBtn.h / 2);
+                    ctx.textBaseline = "alphabetic";
+                    ctx.textAlign = "left";
                 }
 
                 // Draw info - centered
